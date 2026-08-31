@@ -62,8 +62,9 @@ No hay `.specify/extensions.yml`, así que **ninguna skill crea ramas**. Lo hace
 - Antes de crear la rama, comprueba que lo que hay sin commitear en `main` pertenece de verdad
   a la feature. Lo que sea infraestructura común (scaffolding, config, tooling) se commitea a
   `main` primero.
-- La feature activa está apuntada en `.specify/feature.json`; ese fichero vive en la rama de
-  la feature, no en `main`.
+- La feature activa está apuntada en `.specify/feature.json`, que está **gitignorado** (estado
+  local de cada checkout). Si al cambiar de rama no coincide con la feature en curso,
+  reescríbelo; no lo commitees.
 - Commitea el artefacto al final de cada fase, con mensaje `<fase>: <qué>`
   (p. ej. `spec: dataset mock de ventas farma`).
 - **Nunca hagas `push`, ni abras PR, ni hagas merge sin que el usuario te lo pida.**
