@@ -37,12 +37,12 @@ código Python, `tests/` para la suite. Rutas relativas a la raíz del repositor
 
 **Purpose**: dejar el entorno en condiciones de ejecutar `pytest` contra Snowflake.
 
-- [ ] T001 Verificar la instalación real de `snowflake-connector-python` en `.venv` (Python 3.14.6) ejecutando `poetry add snowflake-connector-python`; si falla por ausencia de wheel o por falta de compilador C, recrear `.venv` con Python 3.12 y anotar el desenlace en la sección "Riesgo abierto" de `specs/001-mock-sales-dataset/plan.md` — **BLOQUEA todo lo demás** (ver research.md D-06)
-- [ ] T002 Añadir `snowflake-connector-python ^4.7` y `python-dotenv ^1.2` a `[project].dependencies` en `pyproject.toml` y regenerar `poetry.lock`
-- [ ] T003 [P] Declarar el marker `writes_db` en `[tool.pytest.ini_options].markers` de `pyproject.toml`
-- [ ] T004 [P] Crear `src/conversational_analytics/db.py` con `get_connection()`: carga `.env` con `python-dotenv` si existe, lee las 7 variables `SNOWFLAKE_*` de `os.environ`, y falla con un mensaje explícito indicando cuál falta
-- [ ] T005 Crear `tests/conftest.py` con una fixture de sesión `sf_conn` que abra una única conexión para toda la suite, y helpers `fetch_one(sql)` / `fetch_all(sql)`
-- [ ] T006 Crear `tests/test_connection.py` con un smoke test que ejecute `SELECT 1` y compruebe que el rol activo es `CICD_DEMO_ROLE` y la base `CICD_DEMO`
+- [X] T001 Verificar la instalación real de `snowflake-connector-python` en `.venv` (Python 3.14.6) ejecutando `poetry add snowflake-connector-python`; si falla por ausencia de wheel o por falta de compilador C, recrear `.venv` con Python 3.12 y anotar el desenlace en la sección "Riesgo abierto" de `specs/001-mock-sales-dataset/plan.md` — **BLOQUEA todo lo demás** (ver research.md D-06)
+- [X] T002 Añadir `snowflake-connector-python ^4.7` y `python-dotenv ^1.2` a `[project].dependencies` en `pyproject.toml` y regenerar `poetry.lock`
+- [X] T003 [P] Declarar el marker `writes_db` en `[tool.pytest.ini_options].markers` de `pyproject.toml`
+- [X] T004 [P] Crear `src/conversational_analytics/db.py` con `get_connection()`: carga `.env` con `python-dotenv` si existe, lee las 7 variables `SNOWFLAKE_*` de `os.environ`, y falla con un mensaje explícito indicando cuál falta
+- [X] T005 Crear `tests/conftest.py` con una fixture de sesión `sf_conn` que abra una única conexión para toda la suite, y helpers `fetch_one(sql)` / `fetch_all(sql)`
+- [X] T006 Crear `tests/test_connection.py` con un smoke test que ejecute `SELECT 1` y compruebe que el rol activo es `CICD_DEMO_ROLE` y la base `CICD_DEMO`
 
 **Checkpoint**: `poetry run pytest tests/test_connection.py` en verde. Hay conexión a Snowflake desde Python.
 
@@ -55,9 +55,9 @@ historia puede empezar.
 
 **⚠️ CRITICAL**: ninguna historia de usuario puede comenzar hasta completar esta fase.
 
-- [ ] T007 Escribir en `tests/test_dataset.py` los tests de dimensiones, que **DEBEN FALLAR** ahora: `test_dimension_row_counts` (12 y 10, invariante I-01), `test_no_nulls` limitado a `DIM_PRODUCT` y `DIM_COUNTRY` (I-03), `test_closed_domains` (5 áreas / 2 unidades / 4 regiones, con ≥2 productos por unidad y ≥2 países por región, I-07) y `test_launch_years_precede_history` (`MAX(LAUNCH_YEAR) < 2023`, I-08)
-- [ ] T008 Crear `snowflake/002_tables.sql`: `CREATE OR REPLACE TABLE` de `DIM_PRODUCT`, `DIM_COUNTRY` y `FACT_SALES` en `CICD_DEMO.DATA`, con los tipos y `NOT NULL` de data-model.md y las declaraciones `PRIMARY KEY` / `FOREIGN KEY` (metadatos para la futura semantic view; Snowflake no las impone)
-- [ ] T009 Crear `snowflake/003_seed.sql`: cabecera con `USE ROLE CICD_DEMO_ROLE` / `USE SCHEMA CICD_DEMO.DATA`, `TRUNCATE TABLE` de las tres tablas, e `INSERT ... VALUES` literales de las 12 filas de `DIM_PRODUCT` y las 10 de `DIM_COUNTRY` exactamente como figuran en data-model.md (sin tildes ni `ñ`)
+- [X] T007 Escribir en `tests/test_dataset.py` los tests de dimensiones, que **DEBEN FALLAR** ahora: `test_dimension_row_counts` (12 y 10, invariante I-01), `test_no_nulls` limitado a `DIM_PRODUCT` y `DIM_COUNTRY` (I-03), `test_closed_domains` (5 áreas / 2 unidades / 4 regiones, con ≥2 productos por unidad y ≥2 países por región, I-07) y `test_launch_years_precede_history` (`MAX(LAUNCH_YEAR) < 2023`, I-08)
+- [X] T008 Crear `snowflake/002_tables.sql`: `CREATE OR REPLACE TABLE` de `DIM_PRODUCT`, `DIM_COUNTRY` y `FACT_SALES` en `CICD_DEMO.DATA`, con los tipos y `NOT NULL` de data-model.md y las declaraciones `PRIMARY KEY` / `FOREIGN KEY` (metadatos para la futura semantic view; Snowflake no las impone)
+- [X] T009 Crear `snowflake/003_seed.sql`: cabecera con `USE ROLE CICD_DEMO_ROLE` / `USE SCHEMA CICD_DEMO.DATA`, `TRUNCATE TABLE` de las tres tablas, e `INSERT ... VALUES` literales de las 12 filas de `DIM_PRODUCT` y las 10 de `DIM_COUNTRY` exactamente como figuran en data-model.md (sin tildes ni `ñ`)
 - [ ] T010 Desplegar con `snow sql -f snowflake/002_tables.sql` y `snow sql -f snowflake/003_seed.sql`, y comprobar que los tests de T007 pasan
 
 **Checkpoint**: dimensiones cargadas y verificadas. `FACT_SALES` existe pero está vacía.
@@ -78,14 +78,14 @@ ventas netas coincide con la suma de brutas menos descuentos.
 
 > **Escribir primero y comprobar que FALLAN antes de tocar el SQL.**
 
-- [ ] T011 [US1] Añadir a `tests/test_dataset.py`: `test_fact_row_count` (12.960, I-01), `test_month_grid_is_complete` (36 meses distintos y consecutivos, de `2023-01-01` a `2025-12-01`, I-02), `test_every_combination_has_all_months` (ninguna de las 360 combinaciones producto×país×canal tiene ≠ 36 meses, I-11) y `test_country_list_matches_dimension` (los `COUNTRY_CODE` de `FACT_SALES` coinciden exactamente con los de `DIM_COUNTRY`, I-12)
-- [ ] T012 [US1] Añadir a `tests/test_dataset.py`: `test_no_nulls` ampliado a `FACT_SALES` (I-03) y `test_no_orphan_references` (anti-join contra ambas dimensiones = 0 filas, I-04)
-- [ ] T013 [US1] Añadir a `tests/test_dataset.py`: `test_net_sales_always_positive` (I-05), `test_discount_rate_within_bounds` (ratio entre 0 y 0.40, I-06) y `test_brand_ranking_has_no_ties` (el top-5 de marcas por ventas netas tiene 5 valores distintos, I-10)
+- [X] T011 [US1] Añadir a `tests/test_dataset.py`: `test_fact_row_count` (12.960, I-01), `test_month_grid_is_complete` (36 meses distintos y consecutivos, de `2023-01-01` a `2025-12-01`, I-02), `test_every_combination_has_all_months` (ninguna de las 360 combinaciones producto×país×canal tiene ≠ 36 meses, I-11) y `test_country_list_matches_dimension` (los `COUNTRY_CODE` de `FACT_SALES` coinciden exactamente con los de `DIM_COUNTRY`, I-12)
+- [X] T012 [US1] Añadir a `tests/test_dataset.py`: `test_no_nulls` ampliado a `FACT_SALES` (I-03) y `test_no_orphan_references` (anti-join contra ambas dimensiones = 0 filas, I-04)
+- [X] T013 [US1] Añadir a `tests/test_dataset.py`: `test_net_sales_always_positive` (I-05), `test_discount_rate_within_bounds` (ratio entre 0 y 0.40, I-06) y `test_brand_ranking_has_no_ties` (el top-5 de marcas por ventas netas tiene 5 valores distintos, I-10)
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Ampliar `snowflake/003_seed.sql` con el `INSERT` de `FACT_SALES`: CTE `COUNTRY_ORDINAL` con el mapa literal código→ordinal (BR=1 … US=10), CTE `CHANNELS` con los tres canales y su ordinal, CTE `MONTHS` con `ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1` sobre `GENERATOR(ROWCOUNT => 36)`, y el `CROSS JOIN` de los cuatro conjuntos
-- [ ] T015 [US1] En el mismo `INSERT` de `snowflake/003_seed.sql`, calcular las medidas **sin componente temporal todavía**: `base_p`, `f_pais`, `f_canal` y `f_ruido` para `UNITS_SOLD`; `precio_p` para `GROSS_SALES_EUR`; y `tasa_desc` para `DISCOUNT_EUR`, según las fórmulas de data-model.md
+- [X] T014 [US1] Ampliar `snowflake/003_seed.sql` con el `INSERT` de `FACT_SALES`: CTE `COUNTRY_ORDINAL` con el mapa literal código→ordinal (BR=1 … US=10), CTE `CHANNELS` con los tres canales y su ordinal, CTE `MONTHS` con `ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1` sobre `GENERATOR(ROWCOUNT => 36)`, y el `CROSS JOIN` de los cuatro conjuntos
+- [X] T015 [US1] En el mismo `INSERT` de `snowflake/003_seed.sql`, calcular las medidas **sin componente temporal todavía**: `base_p`, `f_pais`, `f_canal` y `f_ruido` para `UNITS_SOLD`; `precio_p` para `GROSS_SALES_EUR`; y `tasa_desc` para `DISCOUNT_EUR`, según las fórmulas de data-model.md
 - [ ] T016 [US1] Desplegar `snow sql -f snowflake/003_seed.sql` y comprobar que T011, T012 y T013 pasan y que los tests de la Fase 2 no han regresado
 
 **Checkpoint**: dataset consultable. Las preguntas Q-01 a Q-04 y Q-07 a Q-11 del catálogo ya tienen respuesta. **Este es el MVP entregable.**
@@ -103,11 +103,11 @@ un ranking de crecimiento empataría.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T017 [US2] Añadir a `tests/test_dataset.py`: `test_yoy_growth_by_area_has_no_ties` (la variación interanual 2024→2025 de las 5 áreas terapéuticas da 5 valores distintos y un máximo único) y `test_monthly_series_varies` (la serie de 36 meses de una marca en un país tiene al menos 30 valores distintos de `UNITS_SOLD` y no es monótona) — **DEBEN FALLAR** con la fórmula plana de la Fase 3
+- [X] T017 [US2] Añadir a `tests/test_dataset.py`: `test_yoy_growth_by_area_has_no_ties` (la variación interanual 2024→2025 de las 5 áreas terapéuticas da 5 valores distintos y un máximo único) y `test_monthly_series_varies` (la serie de 36 meses de una marca en un país tiene al menos 30 valores distintos de `UNITS_SOLD` y no es monótona) — **DEBEN FALLAR** con la fórmula plana de la Fase 3
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Añadir a la fórmula de `UNITS_SOLD` en `snowflake/003_seed.sql` los factores `f_tendencia` = `1 + 0.002 * (MOD(p,5) + 1) * m` y `f_estacional` = `1 + 0.18 * SIN(2 * PI() * (m + p) / 12)`, según data-model.md
+- [X] T018 [US2] Añadir a la fórmula de `UNITS_SOLD` en `snowflake/003_seed.sql` los factores `f_tendencia` = `1 + 0.002 * (MOD(p,5) + 1) * m` y `f_estacional` = `1 + 0.18 * SIN(2 * PI() * (m + p) / 12)`, según data-model.md
 - [ ] T019 [US2] Desplegar `snow sql -f snowflake/003_seed.sql` y comprobar que T017 pasa y que ningún test de US1 ni de la Fase 2 ha regresado (en particular `test_net_sales_always_positive` y `test_brand_ranking_has_no_ties`)
 
 **Checkpoint**: preguntas Q-05 y Q-06 del catálogo respondidas. El dataset ya sirve para toda la demo conversacional.
@@ -129,13 +129,13 @@ agregadas idénticos, sin filas duplicadas.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T020 [US3] Añadir a `tests/test_dataset.py` el test `test_reload_is_idempotent` marcado con `@pytest.mark.writes_db` (I-09): captura recuentos y `SUM` de las tres medidas, vuelve a ejecutar el contenido de `003_seed.sql` desde la conexión, y compara que todo es idéntico
+- [X] T020 [US3] Añadir a `tests/test_dataset.py` el test `test_reload_is_idempotent` marcado con `@pytest.mark.writes_db` (I-09): captura recuentos y `SUM` de las tres medidas, vuelve a ejecutar el contenido de `003_seed.sql` desde la conexión, y compara que todo es idéntico
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Auditar `snowflake/002_tables.sql` y `snowflake/003_seed.sql`: confirmar que no aparecen `RANDOM(`, `HASH(`, `CURRENT_DATE`, `CURRENT_TIMESTAMP` ni `SEQ4()` sin envolver en `ROW_NUMBER()`, y que cada `INSERT` va precedido de su `TRUNCATE`
+- [X] T021 [US3] Auditar `snowflake/002_tables.sql` y `snowflake/003_seed.sql`: confirmar que no aparecen `RANDOM(`, `HASH(`, `CURRENT_DATE`, `CURRENT_TIMESTAMP` ni `SEQ4()` sin envolver en `ROW_NUMBER()`, y que cada `INSERT` va precedido de su `TRUNCATE`
 - [ ] T022 [US3] Ejecutar la secuencia completa dos veces (`002` y `003`, seguidos de `002` y `003` de nuevo) y verificar que T020 pasa
-- [ ] T023 [US3] Documentar en `specs/001-mock-sales-dataset/quickstart.md` y en `snowflake/README.md` cómo excluir los tests que escriben: `poetry run pytest -m "not writes_db"`
+- [X] T023 [US3] Documentar en `specs/001-mock-sales-dataset/quickstart.md` y en `snowflake/README.md` cómo excluir los tests que escriben: `poetry run pytest -m "not writes_db"`
 
 **Checkpoint**: las tres historias completas. El dataset es reproducible y está listo para el pipeline.
 
@@ -143,11 +143,19 @@ agregadas idénticos, sin filas duplicadas.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T024 [P] Crear `tests/test_reference_questions.py` con las 12 consultas de `specs/001-mock-sales-dataset/contracts/reference-questions.md`, cada una con la aserción indicada en su fila (incluida Q-12, que debe devolver cero filas sin lanzar error) — cubre SC-003
-- [ ] T025 [P] Actualizar la tabla de scripts de `snowflake/README.md`: `002_tables.sql` y `003_seed.sql` dejan de figurar como pendientes y pasan a la tabla de scripts numerados con su descripción
+- [X] T024 [P] Crear `tests/test_reference_questions.py` con las 12 consultas de `specs/001-mock-sales-dataset/contracts/reference-questions.md`, cada una con la aserción indicada en su fila (incluida Q-12, que debe devolver cero filas sin lanzar error) — cubre SC-003
+- [X] T025 [P] Actualizar la tabla de scripts de `snowflake/README.md`: `002_tables.sql` y `003_seed.sql` dejan de figurar como pendientes y pasan a la tabla de scripts numerados con su descripción
 - [ ] T026 Ejecutar de principio a fin `specs/001-mock-sales-dataset/quickstart.md` sobre un schema limpio y corregir cualquier paso que no funcione tal como está escrito
 - [ ] T027 Comprobar el objetivo de rendimiento del plan: cada consulta del catálogo de referencia responde en menos de 5 s sobre `COMPUTE_WH`
 - [ ] T028 Revisión final contra `.specify/memory/constitution.md`: confirmar que no se ha aplicado nada a mano en la consola de Snowflake (Principio III), que no hay credenciales en el repositorio (Principio V) y que el delta de tokens de la PR es cero (Principio IV)
+
+---
+
+## Estado
+
+> **Bloqueadas por falta de conexión**: T010, T016, T019, T022, T026, T027 y T028 requieren
+> desplegar contra Snowflake. `.env` está creado pero sin rellenar y no hay conexión `snow`
+> registrada. Todo el SQL y todos los tests están escritos; queda ejecutarlos.
 
 ---
 

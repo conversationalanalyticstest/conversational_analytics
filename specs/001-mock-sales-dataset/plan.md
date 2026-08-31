@@ -132,13 +132,14 @@ feature y crearlas vacías contradiría el Principio I.
 | `python-dotenv` | Carga `.env` en local. En CI no encuentra fichero y no hace nada, así que el código de conexión es **uno solo** para local y para CI. | *Leer sólo `os.environ` y exigir que cada dev exporte 7 variables a mano en cada sesión*: fricción diaria y una fuente segura de errores; además rompe el "clonar, `poetry install`, rellenar `.env`" del Principio V. |
 | Módulo `db.py` | Centraliza la lectura de 7 variables de entorno y la apertura de conexión. | *Repetir el bloque de conexión en cada test*: duplicación que habría que tocar en cada feature futura. No es abstracción especulativa: el agente y la telemetría lo consumirán. |
 
-## Riesgo abierto
+## Riesgo abierto — RESUELTO (2026-08-31, T001)
 
-**Wheel del conector para Python 3.14.** El venv corre 3.14.6 y la máquina no tiene compilador
-C. La resolución en seco de `snowflake-connector-python 4.7.2` para 3.14 se completó sin
-errores, pero **la instalación real no está verificada**. Mitigación si falla: recrear el venv
-con Python 3.12 (`requires-python` ya lo admite). Debe ser la **primera tarea** de la fase de
-implementación, antes de escribir ningún test. Detalle en [research.md](research.md) (D-06).
+**Wheel del conector para Python 3.14.** Se temía que `snowflake-connector-python` no tuviera
+wheel para 3.14 y que, sin compilador C en la máquina, la instalación fallara.
+
+**Desenlace**: `poetry add snowflake-connector-python python-dotenv` completó sin errores.
+Verificado con `import snowflake.connector` → **4.7.2 sobre Python 3.14.6**. No hace falta bajar
+el venv a 3.12. Detalle de la decisión en [research.md](research.md) (D-06).
 
 ## Artefactos de la Fase 1
 
