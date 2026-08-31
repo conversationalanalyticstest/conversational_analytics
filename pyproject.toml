@@ -1,0 +1,20 @@
+[project]
+name = "conversational-analytics"
+version = "0.1.0"
+description = "Demo de CI/CD sobre Snowflake: agente conversacional que consulta datos via semantic views"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = []
+
+[tool.poetry]
+packages = [{ include = "conversational_analytics", from = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
