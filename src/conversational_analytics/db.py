@@ -3,6 +3,11 @@
 Unico punto del proyecto donde se abre una conexion. Las credenciales salen siempre de
 variables de entorno (Principio V de la constitucion): en local desde `.env`, en CI desde
 GitHub Secrets. El codigo es el mismo en ambos casos.
+
+La autenticacion va por PAT (Programmatic Access Token). Con
+`authenticator="PROGRAMMATIC_ACCESS_TOKEN"` el conector lee el token del parametro `token`,
+no de `password`: si se pasa en `password` la conexion falla con
+"Programmatic access token is invalid", que despista bastante.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ from dotenv import load_dotenv
 REQUIRED_ENV_VARS = (
     "SNOWFLAKE_ACCOUNT",
     "SNOWFLAKE_USER",
-    "SNOWFLAKE_PASSWORD",
+    "SNOWFLAKE_PAT",
     "SNOWFLAKE_ROLE",
     "SNOWFLAKE_WAREHOUSE",
     "SNOWFLAKE_DATABASE",
@@ -48,7 +53,8 @@ def get_connection() -> snowflake.connector.SnowflakeConnection:
     params: dict[str, Any] = {
         "account": os.environ["SNOWFLAKE_ACCOUNT"],
         "user": os.environ["SNOWFLAKE_USER"],
-        "password": os.environ["SNOWFLAKE_PASSWORD"],
+        "token": os.environ["SNOWFLAKE_PAT"],
+        "authenticator": "PROGRAMMATIC_ACCESS_TOKEN",
         "role": os.environ["SNOWFLAKE_ROLE"],
         "warehouse": os.environ["SNOWFLAKE_WAREHOUSE"],
         "database": os.environ["SNOWFLAKE_DATABASE"],

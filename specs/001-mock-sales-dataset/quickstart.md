@@ -9,17 +9,37 @@ demo y la que replica el pipeline de CI.
 
 1. `001_bootstrap.sql` ya ejecutado en la cuenta (rol, base de datos, schemas, grants).
 2. Rol `CICD_DEMO_ROLE` concedido a tu usuario (`snowflake/manual/grant_user.sql`).
-3. `.env` relleno a partir de `.env.example`:
+3. `.env` relleno a partir de `.env.example`. La autenticación va por **PAT**
+   (Programmatic Access Token), no por contraseña:
    ```
-   SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD,
+   SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PAT,
    SNOWFLAKE_ROLE=CICD_DEMO_ROLE, SNOWFLAKE_WAREHOUSE=COMPUTE_WH,
    SNOWFLAKE_DATABASE=CICD_DEMO, SNOWFLAKE_SCHEMA=DATA
    ```
-4. Conexión de Snowflake CLI registrada:
+   El token se crea en Snowsight (*Settings → Authentication → Programmatic access tokens*)
+   o por SQL, restringido al rol de la demo:
+   ```sql
+   ALTER USER <tu_usuario> ADD PROGRAMMATIC ACCESS TOKEN cicd_demo_token
+     ROLE_RESTRICTION = 'CICD_DEMO_ROLE'
+     DAYS_TO_EXPIRY = 90;
+   ```
+   Snowflake muestra el valor **una sola vez**.
+4. Conexión de Snowflake CLI registrada, también con PAT. Guarda el token en `pat.txt` en la
+   raíz del repositorio (está en `.gitignore`) y regístrala apuntando a ese fichero:
    ```powershell
-   snow connection add --connection-name cicd_demo
+   snow connection add --connection-name cicd_demo `
+     --authenticator PROGRAMMATIC_ACCESS_TOKEN `
+     --token-file-path pat.txt `
+     --account <organizacion>-<cuenta> `
+     --user <tu_usuario> `
+     --role CICD_DEMO_ROLE `
+     --warehouse COMPUTE_WH `
+     --database CICD_DEMO `
+     --schema DATA
    snow connection test --connection cicd_demo
    ```
+   La ruta de `pat.txt` se resuelve **relativa al directorio desde el que lanzas `snow`**, así
+   que ejecuta siempre los comandos desde la raíz del repositorio.
 5. Dependencias instaladas: `poetry install`.
 
 ## Desplegar
@@ -86,6 +106,7 @@ LIMIT 5;
 
 | Síntoma | Causa probable |
 |---|---|
+| `Programmatic access token is invalid` | El PAT se está pasando en `password`. Con `authenticator=PROGRAMMATIC_ACCESS_TOKEN` el conector lo lee de `token` |
 | `Object does not exist` | Falta ejecutar `002_tables.sql`, o el rol/schema del `.env` no es el correcto |
 | Recuento distinto de 12.960 | El seed se ejecutó a medias; volver a lanzar `003_seed.sql` completo |
 | Los tests no conectan | `.env` incompleto, o `SNOWFLAKE_ROLE` distinto de `CICD_DEMO_ROLE` |

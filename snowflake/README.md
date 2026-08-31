@@ -28,8 +28,8 @@ el pipeline.
 
 1. Ejecutar `001_bootstrap.sql` como `ACCOUNTADMIN`.
 2. Editar `manual/grant_user.sql` con tu usuario y ejecutarlo.
-3. Rellenar `.env` a partir de `.env.example` (`SNOWFLAKE_ROLE=CICD_DEMO_ROLE`,
-   `SNOWFLAKE_DATABASE=CICD_DEMO`).
+3. Crear un PAT restringido al rol de la demo y rellenar `.env` a partir de `.env.example`
+   (`SNOWFLAKE_PAT`, `SNOWFLAKE_ROLE=CICD_DEMO_ROLE`, `SNOWFLAKE_DATABASE=CICD_DEMO`).
 4. Desplegar el dataset:
    ```powershell
    snow sql --connection cicd_demo -f snowflake/002_tables.sql

@@ -58,7 +58,7 @@ historia puede empezar.
 - [X] T007 Escribir en `tests/test_dataset.py` los tests de dimensiones, que **DEBEN FALLAR** ahora: `test_dimension_row_counts` (12 y 10, invariante I-01), `test_no_nulls` limitado a `DIM_PRODUCT` y `DIM_COUNTRY` (I-03), `test_closed_domains` (5 áreas / 2 unidades / 4 regiones, con ≥2 productos por unidad y ≥2 países por región, I-07) y `test_launch_years_precede_history` (`MAX(LAUNCH_YEAR) < 2023`, I-08)
 - [X] T008 Crear `snowflake/002_tables.sql`: `CREATE OR REPLACE TABLE` de `DIM_PRODUCT`, `DIM_COUNTRY` y `FACT_SALES` en `CICD_DEMO.DATA`, con los tipos y `NOT NULL` de data-model.md y las declaraciones `PRIMARY KEY` / `FOREIGN KEY` (metadatos para la futura semantic view; Snowflake no las impone)
 - [X] T009 Crear `snowflake/003_seed.sql`: cabecera con `USE ROLE CICD_DEMO_ROLE` / `USE SCHEMA CICD_DEMO.DATA`, `TRUNCATE TABLE` de las tres tablas, e `INSERT ... VALUES` literales de las 12 filas de `DIM_PRODUCT` y las 10 de `DIM_COUNTRY` exactamente como figuran en data-model.md (sin tildes ni `ñ`)
-- [ ] T010 Desplegar con `snow sql -f snowflake/002_tables.sql` y `snow sql -f snowflake/003_seed.sql`, y comprobar que los tests de T007 pasan
+- [X] T010 Desplegar con `snow sql -f snowflake/002_tables.sql` y `snow sql -f snowflake/003_seed.sql`, y comprobar que los tests de T007 pasan
 
 **Checkpoint**: dimensiones cargadas y verificadas. `FACT_SALES` existe pero está vacía.
 
@@ -86,7 +86,7 @@ ventas netas coincide con la suma de brutas menos descuentos.
 
 - [X] T014 [US1] Ampliar `snowflake/003_seed.sql` con el `INSERT` de `FACT_SALES`: CTE `COUNTRY_ORDINAL` con el mapa literal código→ordinal (BR=1 … US=10), CTE `CHANNELS` con los tres canales y su ordinal, CTE `MONTHS` con `ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1` sobre `GENERATOR(ROWCOUNT => 36)`, y el `CROSS JOIN` de los cuatro conjuntos
 - [X] T015 [US1] En el mismo `INSERT` de `snowflake/003_seed.sql`, calcular las medidas **sin componente temporal todavía**: `base_p`, `f_pais`, `f_canal` y `f_ruido` para `UNITS_SOLD`; `precio_p` para `GROSS_SALES_EUR`; y `tasa_desc` para `DISCOUNT_EUR`, según las fórmulas de data-model.md
-- [ ] T016 [US1] Desplegar `snow sql -f snowflake/003_seed.sql` y comprobar que T011, T012 y T013 pasan y que los tests de la Fase 2 no han regresado
+- [X] T016 [US1] Desplegar `snow sql -f snowflake/003_seed.sql` y comprobar que T011, T012 y T013 pasan y que los tests de la Fase 2 no han regresado
 
 **Checkpoint**: dataset consultable. Las preguntas Q-01 a Q-04 y Q-07 a Q-11 del catálogo ya tienen respuesta. **Este es el MVP entregable.**
 
@@ -108,7 +108,7 @@ un ranking de crecimiento empataría.
 ### Implementation for User Story 2
 
 - [X] T018 [US2] Añadir a la fórmula de `UNITS_SOLD` en `snowflake/003_seed.sql` los factores `f_tendencia` = `1 + 0.002 * (MOD(p,5) + 1) * m` y `f_estacional` = `1 + 0.18 * SIN(2 * PI() * (m + p) / 12)`, según data-model.md
-- [ ] T019 [US2] Desplegar `snow sql -f snowflake/003_seed.sql` y comprobar que T017 pasa y que ningún test de US1 ni de la Fase 2 ha regresado (en particular `test_net_sales_always_positive` y `test_brand_ranking_has_no_ties`)
+- [X] T019 [US2] Desplegar `snow sql -f snowflake/003_seed.sql` y comprobar que T017 pasa y que ningún test de US1 ni de la Fase 2 ha regresado (en particular `test_net_sales_always_positive` y `test_brand_ranking_has_no_ties`)
 
 **Checkpoint**: preguntas Q-05 y Q-06 del catálogo respondidas. El dataset ya sirve para toda la demo conversacional.
 
@@ -134,7 +134,7 @@ agregadas idénticos, sin filas duplicadas.
 ### Implementation for User Story 3
 
 - [X] T021 [US3] Auditar `snowflake/002_tables.sql` y `snowflake/003_seed.sql`: confirmar que no aparecen `RANDOM(`, `HASH(`, `CURRENT_DATE`, `CURRENT_TIMESTAMP` ni `SEQ4()` sin envolver en `ROW_NUMBER()`, y que cada `INSERT` va precedido de su `TRUNCATE`
-- [ ] T022 [US3] Ejecutar la secuencia completa dos veces (`002` y `003`, seguidos de `002` y `003` de nuevo) y verificar que T020 pasa
+- [X] T022 [US3] Ejecutar la secuencia completa dos veces (`002` y `003`, seguidos de `002` y `003` de nuevo) y verificar que T020 pasa
 - [X] T023 [US3] Documentar en `specs/001-mock-sales-dataset/quickstart.md` y en `snowflake/README.md` cómo excluir los tests que escriben: `poetry run pytest -m "not writes_db"`
 
 **Checkpoint**: las tres historias completas. El dataset es reproducible y está listo para el pipeline.
@@ -145,17 +145,19 @@ agregadas idénticos, sin filas duplicadas.
 
 - [X] T024 [P] Crear `tests/test_reference_questions.py` con las 12 consultas de `specs/001-mock-sales-dataset/contracts/reference-questions.md`, cada una con la aserción indicada en su fila (incluida Q-12, que debe devolver cero filas sin lanzar error) — cubre SC-003
 - [X] T025 [P] Actualizar la tabla de scripts de `snowflake/README.md`: `002_tables.sql` y `003_seed.sql` dejan de figurar como pendientes y pasan a la tabla de scripts numerados con su descripción
-- [ ] T026 Ejecutar de principio a fin `specs/001-mock-sales-dataset/quickstart.md` sobre un schema limpio y corregir cualquier paso que no funcione tal como está escrito
-- [ ] T027 Comprobar el objetivo de rendimiento del plan: cada consulta del catálogo de referencia responde en menos de 5 s sobre `COMPUTE_WH`
-- [ ] T028 Revisión final contra `.specify/memory/constitution.md`: confirmar que no se ha aplicado nada a mano en la consola de Snowflake (Principio III), que no hay credenciales en el repositorio (Principio V) y que el delta de tokens de la PR es cero (Principio IV)
+- [X] T026 Ejecutar de principio a fin `specs/001-mock-sales-dataset/quickstart.md` sobre un schema limpio y corregir cualquier paso que no funcione tal como está escrito
+- [X] T027 Comprobar el objetivo de rendimiento del plan: cada consulta del catálogo de referencia responde en menos de 5 s sobre `COMPUTE_WH`
+- [X] T028 Revisión final contra `.specify/memory/constitution.md`: confirmar que no se ha aplicado nada a mano en la consola de Snowflake (Principio III), que no hay credenciales en el repositorio (Principio V) y que el delta de tokens de la PR es cero (Principio IV)
 
 ---
 
 ## Estado
 
-> **Bloqueadas por falta de conexión**: T010, T016, T019, T022, T026, T027 y T028 requieren
-> desplegar contra Snowflake. `.env` está creado pero sin rellenar y no hay conexión `snow`
-> registrada. Todo el SQL y todos los tests están escritos; queda ejecutarlos.
+> **28/28 completadas.** Dataset desplegado en `CICD_DEMO.DATA` y verificado: 12.960 filas,
+> 36 meses de 2023-01 a 2025-12, 42 tests en verde. La secuencia `002` + `003` se ha ejecutado
+> dos veces seguidas produciendo cifras idénticas (T022).
+>
+> Consulta más lenta del catálogo: 0,13 s, muy por debajo del objetivo de 5 s (T027).
 
 ---
 
