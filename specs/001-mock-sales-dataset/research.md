@@ -147,11 +147,35 @@ Principio II. Confirmado como asunción en la spec.
 
 ---
 
-## D-08: Los índices numéricos se derivan, no se almacenan
+## D-08: Ordinales estables, asignados una vez y nunca renumerados
 
-**Decisión**: el ordinal de producto sale de `TO_NUMBER(SUBSTR(PRODUCT_ID, 2))`; el de país,
-de `ROW_NUMBER() OVER (ORDER BY COUNTRY_CODE)`; el de canal, de la lista literal de canales.
+**Decisión**: el ordinal de producto sale de `TO_NUMBER(SUBSTR(PRODUCT_ID, 2))`; los de país y
+canal son **literales fijos** en las listas de `003_seed.sql`. Ninguno se calcula con
+`ROW_NUMBER()` sobre la tabla de dimensión.
 
-**Rationale**: la spec fija los atributos de cada dimensión (FR-002, FR-006). Añadir una
-columna `ORDINAL` sólo para alimentar la fórmula ensuciaría el modelo que ve el agente con un
-campo sin significado de negocio. Derivarlos mantiene las dimensiones limpias.
+**Rationale**:
+
+- La fórmula de generación depende de estos ordinales. Si se derivasen del orden de la
+  dimensión (`ROW_NUMBER() OVER (ORDER BY COUNTRY_CODE)`), **añadir un país renumeraría a todos
+  los posteriores alfabéticamente** y cambiarían sus ventas de los tres años de histórico. En
+  una demo eso genera la pregunta incómoda de "¿por qué han cambiado las ventas de Estados
+  Unidos de 2023 si sólo he añadido Portugal?".
+- Con ordinales fijos, ampliar el catálogo es aditivo: el país nuevo recibe el siguiente
+  ordinal libre y las cifras existentes no se mueven.
+- El ordinal de producto ya es estable por construcción: va codificado en el propio
+  `PRODUCT_ID` (`P013` → 13), así que no necesita tratamiento especial.
+
+**Regla de mantenimiento**: los ordinales se asignan una vez y **nunca se reutilizan ni se
+renumeran**. Si se retira un país, su ordinal queda vacante; no se reasigna.
+
+**Coste asumido**: la lista de países de `003_seed.sql` lleva una columna de ordinal que no
+existe en `DIM_COUNTRY`. Es una columna auxiliar de generación, visible sólo en el script.
+
+**Alternativas consideradas**:
+
+| Alternativa | Rechazada porque |
+|---|---|
+| `ROW_NUMBER()` sobre la dimensión | Añadir una fila reescribe el histórico de las demás (ver arriba) |
+| Columna `ORDINAL` física en `DIM_COUNTRY` | Ensucia con un campo sin significado de negocio el modelo que verá el agente en la semantic view |
+| Derivar el ordinal del código ISO (`ASCII` del par de letras) | Estable, pero puede colisionar: dos países compartirían factor y aparecerían empates en los rankings, rompiendo FR-016 |
+

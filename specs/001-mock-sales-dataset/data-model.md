@@ -82,18 +82,21 @@ erDiagram
 
 ### Datos
 
-| COUNTRY_CODE | COUNTRY_NAME | REGION |
-|---|---|---|
-| BR | Brasil | LATAM |
-| CA | Canada | North America |
-| CN | China | APAC |
-| DE | Alemania | Europe |
-| ES | Espana | Europe |
-| FR | Francia | Europe |
-| IT | Italia | Europe |
-| JP | Japon | APAC |
-| MX | Mexico | LATAM |
-| US | Estados Unidos | North America |
+La columna `c` **no se almacena**: es el ordinal de generación, fijado como literal en la lista
+de `003_seed.sql` (ver [research D-08](research.md)).
+
+| COUNTRY_CODE | COUNTRY_NAME | REGION | `c` |
+|---|---|---|---|
+| BR | Brasil | LATAM | 1 |
+| CA | Canada | North America | 2 |
+| CN | China | APAC | 3 |
+| DE | Alemania | Europe | 4 |
+| ES | Espana | Europe | 5 |
+| FR | Francia | Europe | 6 |
+| IT | Italia | Europe | 7 |
+| JP | Japon | APAC | 8 |
+| MX | Mexico | LATAM | 9 |
+| US | Estados Unidos | North America | 10 |
 
 > Sin tildes ni `ñ` a propósito: evita problemas de codificación al ejecutar los `.sql` desde
 > una consola Windows en cp1252 (ver restricciones del entorno).
@@ -101,8 +104,9 @@ erDiagram
 **Dominio `REGION`** (4): `Europe` (4), `North America` (2), `LATAM` (2), `APAC` (2) → cumple
 FR-007 (≥2 por región).
 
-**Ordinal derivado** `c` = `ROW_NUMBER() OVER (ORDER BY COUNTRY_CODE)` → BR=1, CA=2, CN=3,
-DE=4, ES=5, FR=6, IT=7, JP=8, MX=9, US=10.
+**Regla de mantenimiento**: al añadir un país se le asigna el **siguiente ordinal libre** (11,
+12, …), nunca se renumeran los existentes. Así las cifras históricas de los países ya presentes
+no cambian. Lo mismo aplica a los productos: `P013` en adelante.
 
 ---
 
@@ -143,12 +147,12 @@ $m \in [0, 35]$ → de `2023-01-01` a `2025-12-01`.
 
 Todas las cifras se derivan de cuatro índices enteros. No interviene ningún número aleatorio.
 
-| Índice | Origen | Rango |
-|---|---|---|
-| $p$ | `TO_NUMBER(SUBSTR(PRODUCT_ID, 2))` | 1..12 |
-| $c$ | `ROW_NUMBER() OVER (ORDER BY COUNTRY_CODE)` | 1..10 |
-| $ch$ | ordinal del canal | 1..3 |
-| $m$ | `ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1` | 0..35 |
+| Índice | Origen | Estable al añadir filas | Rango |
+|---|---|---|---|
+| $p$ | `TO_NUMBER(SUBSTR(PRODUCT_ID, 2))` | Sí — el ID ya lleva el número | 1..12 |
+| $c$ | Literal en la lista de países de `003_seed.sql` | Sí — se asigna el siguiente libre | 1..10 |
+| $ch$ | Literal en la lista de canales de `003_seed.sql` | Sí | 1..3 |
+| $m$ | `ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1` | Sí — sólo crece por el final | 0..35 |
 
 ### Factores
 
@@ -201,3 +205,4 @@ Cada una se traduce en un test (ver [contracts/dataset-contract.md](contracts/da
 | I-09 | Recargar produce idénticos recuentos y agregados | FR-017, FR-018, SC-004 |
 | I-10 | El top-5 de marcas por ventas netas no tiene empates | FR-016 |
 | I-11 | Las 360 combinaciones producto×país×canal aparecen en los 36 meses | FR-011 |
+| I-12 | `FACT_SALES` contiene exactamente los 10 `COUNTRY_CODE` de `DIM_COUNTRY`, ni uno más ni uno menos | D-08 — detecta que la lista de ordinales de `003_seed.sql` se ha desincronizado de la dimensión |

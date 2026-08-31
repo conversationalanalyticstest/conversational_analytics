@@ -45,6 +45,13 @@ Un consumidor puede asumir, sin comprobarlo:
 - **Los datos son ficticios.** No representan a ninguna compañía real y no deben presentarse
   como tales.
 
+## Ampliar el catálogo
+
+Añadir un producto o un país es **aditivo**: recibe el siguiente ordinal de generación libre y
+las cifras de los ya existentes **no cambian** (ver [research D-08](../research.md)). Lo que sí
+cambia son los recuentos del contrato (12 / 10 / 12.960), que están fijados en los tests y
+deben actualizarse en la misma PR.
+
 ## Tests que verifican el contrato
 
 Un test por invariante del modelo de datos. Se escriben **antes** que el SQL (Principio II).
@@ -62,6 +69,7 @@ Un test por invariante del modelo de datos. Se escriben **antes** que el SQL (Pr
 | `test_reload_is_idempotent` | I-09 | Recargar `003_seed.sql` deja recuentos y sumas idénticos |
 | `test_brand_ranking_has_no_ties` | I-10 | El top-5 por ventas netas tiene 5 valores distintos |
 | `test_every_combination_has_all_months` | I-11 | Ninguna de las 360 combinaciones tiene ≠ 36 meses |
+| `test_country_list_matches_dimension` | I-12 | Los `COUNTRY_CODE` de `FACT_SALES` coinciden exactamente con los de `DIM_COUNTRY` |
 | `test_reference_questions` | SC-003 | Cada consulta de [reference-questions.md](reference-questions.md) devuelve resultado no vacío y numérico no nulo |
 
 `test_reload_is_idempotent` **escribe** en la base de datos: debe marcarse para poder excluirlo

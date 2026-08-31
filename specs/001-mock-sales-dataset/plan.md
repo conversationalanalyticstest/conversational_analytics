@@ -15,8 +15,11 @@ ni con un script de Python, sino con una fórmula aritmética sobre los índices
 (producto, país, canal, mes). Eso hace la carga reproducible bit a bit en cualquier cuenta,
 sin depender de `RANDOM()` ni de `HASH()`, y permite explicar el dataset entero en una
 transparencia. Dos scripts idempotentes (`002_tables.sql` para la estructura, `003_seed.sql`
-para los datos) desplegados con `snow sql -f`, y una suite de `pytest` que verifica las once
+para los datos) desplegados con `snow sql -f`, y una suite de `pytest` que verifica las doce
 invariantes del contrato antes de que exista el SQL.
+
+Los ordinales que alimentan la fórmula son **fijos**, no derivados del orden de la dimensión:
+añadir un producto o un país más adelante no altera las cifras históricas de los ya existentes.
 
 ## Technical Context
 
@@ -105,7 +108,7 @@ src/conversational_analytics/
 
 tests/
 ├── conftest.py                        # NUEVO — fixture de conexion, marker writes_db
-└── test_dataset.py                    # NUEVO — 12 tests del contrato
+└── test_dataset.py                    # NUEVO — 13 tests del contrato
 ```
 
 **Structure Decision**: proyecto único. El artefacto que se despliega es SQL bajo `snowflake/`,
@@ -139,8 +142,8 @@ implementación, antes de escribir ningún test. Detalle en [research.md](resear
 
 | Artefacto | Contenido |
 |---|---|
-| [research.md](research.md) | 8 decisiones: generación determinista, `SEQ4`, idempotencia, neto derivado, despliegue, acceso desde tests, rango fijo, índices derivados |
-| [data-model.md](data-model.md) | Esquema de las 3 tablas, las 22 filas de dimensión literales, la fórmula completa y 11 invariantes |
+| [research.md](research.md) | 8 decisiones: generación determinista, `SEQ4`, idempotencia, neto derivado, despliegue, acceso desde tests, rango fijo, ordinales estables |
+| [data-model.md](data-model.md) | Esquema de las 3 tablas, las 22 filas de dimensión literales, la fórmula completa y 12 invariantes |
 | [contracts/dataset-contract.md](contracts/dataset-contract.md) | 8 garantías al consumidor, 4 no-garantías, y el mapa invariante → test |
 | [contracts/reference-questions.md](contracts/reference-questions.md) | 12 preguntas de referencia con su aserción esperada |
 | [quickstart.md](quickstart.md) | Prerrequisitos, despliegue, validación y guía de fallos |
