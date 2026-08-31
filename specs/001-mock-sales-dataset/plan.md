@@ -107,8 +107,10 @@ src/conversational_analytics/
 └── db.py                              # NUEVO — get_connection() desde variables de entorno
 
 tests/
-├── conftest.py                        # NUEVO — fixture de conexion, marker writes_db
-└── test_dataset.py                    # NUEVO — 13 tests del contrato
+├── conftest.py                        # NUEVO — fixture de conexion, helpers de consulta
+├── test_connection.py                 # NUEVO — smoke test de conectividad
+├── test_dataset.py                    # NUEVO — 13 tests de las 12 invariantes
+└── test_reference_questions.py        # NUEVO — las 12 preguntas de referencia (SC-003)
 ```
 
 **Structure Decision**: proyecto único. El artefacto que se despliega es SQL bajo `snowflake/`,
