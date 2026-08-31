@@ -61,6 +61,8 @@ responde en menos de 5 s sobre `COMPUTE_WH` (XS). Con 12.960 filas (~1 MB) el ma
 ## Constitution Check
 
 *GATE: revisado antes de la Fase 0 y de nuevo tras el diseño de la Fase 1. Ambas veces pasa.*
+*Revisado por tercera vez tras la implementación (fase `speckit-converge`): el Principio V pasa
+a **excepción documentada**. Ver Complexity Tracking.*
 
 | Principio | Veredicto | Justificación |
 |---|---|---|
@@ -68,7 +70,7 @@ responde en menos de 5 s sobre `COMPUTE_WH` (XS). Con 12.960 filas (~1 MB) el ma
 | **II. Evaluación del agente como test** | ✅ PASA | Todavía no hay agente, pero esta feature ya deja el [catálogo de 12 preguntas de referencia](contracts/reference-questions.md) versionado, con la aserción esperada de cada una, incluida una pregunta insatisfacible para validar el "no hay datos". Los tests de datos se escriben **antes** del SQL. |
 | **III. CI/CD es el producto** | ✅ PASA | El 100 % del artefacto desplegable es SQL en Git. Nada se aplica a mano en la consola. Los scripts son idempotentes, luego reejecutables por el pipeline y reversibles volviendo a un commit anterior. |
 | **IV. Observabilidad y control de coste** | ➖ N/A | Esta feature no invoca ningún modelo. Delta de tokens: **cero**. Se deja constancia expresa para que la PR no tenga que justificar coste. |
-| **V. Reproducibilidad y gestión de secretos** | ✅ PASA | Dependencias por Poetry y `poetry.lock`. Credenciales sólo por variables de entorno; `.env` ignorado y `.env.example` ya documenta las 7 variables. Puesta en marcha: clonar, `poetry install`, rellenar `.env`, dos `snow sql -f`. |
+| **V. Reproducibilidad y gestión de secretos** | ⚠️ EXCEPCIÓN DOCUMENTADA | Dependencias por Poetry y `poetry.lock`. Credenciales sólo por variables de entorno o ficheros ignorados; `.env` y `pat.txt` en `.gitignore`, y `.env.example` documenta las 7 variables. **Desviación**: la puesta en marcha no son tres pasos sino cinco, y el PAT queda duplicado en `.env` y `pat.txt`. Justificada en Complexity Tracking. |
 
 **Restricciones tecnológicas**: se respetan (Python + Poetry, Snowflake, `pytest`). Se
 introducen dos dependencias nuevas, justificadas abajo en Complexity Tracking.
@@ -123,14 +125,47 @@ feature y crearlas vacías contradiría el Principio I.
 
 ## Complexity Tracking
 
-> Ninguna violación de la constitución. Se documentan aquí las dos dependencias nuevas porque
-> las Restricciones Tecnológicas exigen justificar por escrito cualquier añadido.
+> Una excepción al Principio V, aceptada por el equipo y detallada al final de esta sección. Se
+> documentan además las dos dependencias nuevas porque las Restricciones Tecnológicas exigen
+> justificar por escrito cualquier añadido.
 
 | Añadido | Por qué es necesario | Alternativa más simple, y por qué se rechaza |
 |---|---|---|
 | `snowflake-connector-python` | La constitución fija `pytest` como runner y exige tests contra Snowflake. Sin cliente Python no hay forma de ejecutar ni una sola aserción. | *Validar sólo con `snow sql` y comparar salidas a ojo*: no es automatizable ni integrable en CI, y deja los tests fuera del gate de PR. Se descarta también `snowflake-snowpark-python`: arrastra un stack mucho mayor para ejecutar cuatro `SELECT COUNT(*)`. |
 | `python-dotenv` | Carga `.env` en local. En CI no encuentra fichero y no hace nada, así que el código de conexión es **uno solo** para local y para CI. | *Leer sólo `os.environ` y exigir que cada dev exporte 7 variables a mano en cada sesión*: fricción diaria y una fuente segura de errores; además rompe el "clonar, `poetry install`, rellenar `.env`" del Principio V. |
 | Módulo `db.py` | Centraliza la lectura de 7 variables de entorno y la apertura de conexión. | *Repetir el bloque de conexión en cada test*: duplicación que habría que tocar en cada feature futura. No es abstracción especulativa: el agente y la telemetría lo consumirán. |
+
+### Excepción aceptada al Principio V — el PAT vive en dos sitios
+
+**Qué exige la constitución.** «Poner en marcha el proyecto en una máquina nueva MUST requerir
+únicamente: clonar, `poetry install`, y rellenar `.env`».
+
+**Qué hacemos en realidad.** El despliegue usa `snow sql -f` (decisión D-05 de
+[research.md](research.md)), y la CLI de Snowflake no lee `.env`: necesita su propia conexión
+registrada en `~/.snowflake/config.toml`, que a su vez apunta a un fichero `pat.txt` con el
+token. La puesta en marcha son cinco pasos —clonar, `poetry install`, rellenar `.env`, escribir
+`pat.txt`, `snow connection add`— y **el mismo PAT queda copiado en dos ficheros distintos**.
+
+**Por qué se acepta.** Los dos consumidores del token son de naturaleza distinta: `pytest`
+consulta (Python, `.env`) y la CLI despliega (`snow`, `config.toml`). Unificarlos exigiría
+escribir un runner de SQL en Python, y eso mete código de fontanería en un repositorio cuyo
+valor pedagógico depende de ser legible de una sentada (Principio I). Se prefiere pagar el
+coste en documentación antes que en código.
+
+**Alternativa descartada.** *Ejecutar los `.sql` desde Python con `execute_string()` sobre la
+conexión de `db.py`*: eliminaría el segundo fichero de secreto y devolvería la puesta en marcha
+a tres pasos, pero añade un módulo que hay que mantener, probar y explicar, y sustituye una
+herramienta oficial por una casera. Queda como opción si la duplicación llega a doler.
+
+**Mitigaciones vigentes.**
+
+- `.env` y `pat.txt` están en `.gitignore`, verificado con `git check-ignore`.
+- El PAT se crea con `ROLE_RESTRICTION = 'CICD_DEMO_ROLE'` y caducidad de 90 días.
+- La rotación se documenta como una sola operación que toca los **dos** ficheros.
+
+**Deuda que hereda la feature de CI.** El workflow de GitHub Actions tendrá que materializar
+`pat.txt` desde un GitHub Secret antes de invocar `snow`, o cambiar entonces al runner en
+Python. Debe decidirse al planificar esa feature, no ahora.
 
 ## Riesgo abierto — RESUELTO (2026-08-31, T001)
 

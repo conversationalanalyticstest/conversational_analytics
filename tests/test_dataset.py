@@ -359,6 +359,29 @@ def test_out_of_range_year_returns_no_rows(fetch_all: Callable[[str], list[tuple
     assert rows == []
 
 
+def test_unknown_dimension_values_return_no_rows(
+    fetch_all: Callable[[str], list[tuple[Any, ...]]],
+) -> None:
+    """Caso límite del spec: una combinación inexistente da cero filas, no un error.
+
+    La rejilla es completa (I-11), así que ninguna combinación de marca, país y canal
+    *existentes* está vacía. El caso sólo se provoca con valores que no están en las
+    dimensiones, que es justo lo que preguntará el agente cuando el usuario se invente
+    una marca o un país.
+    """
+    rows = fetch_all(
+        f"""
+        SELECT SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES_EUR
+        FROM {SCHEMA}.FACT_SALES f
+        JOIN {SCHEMA}.DIM_PRODUCT p ON p.PRODUCT_ID = f.PRODUCT_ID
+        WHERE p.BRAND = 'Marca Inexistente'
+          AND f.COUNTRY_CODE = 'ZZ'
+        GROUP BY p.BRAND, f.COUNTRY_CODE
+        """
+    )
+    assert rows == []
+
+
 # ======================================================================================
 # User Story 2 — comparar evolución temporal
 #

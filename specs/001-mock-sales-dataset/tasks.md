@@ -153,11 +153,14 @@ agregadas idénticos, sin filas duplicadas.
 
 ## Estado
 
-> **28/28 completadas.** Dataset desplegado en `CICD_DEMO.DATA` y verificado: 12.960 filas,
-> 36 meses de 2023-01 a 2025-12, 42 tests en verde. La secuencia `002` + `003` se ha ejecutado
+> **31/31 completadas.** Dataset desplegado en `CICD_DEMO.DATA` y verificado: 12.960 filas,
+> 36 meses de 2023-01 a 2025-12, 43 tests en verde. La secuencia `002` + `003` se ha ejecutado
 > dos veces seguidas produciendo cifras idénticas (T022).
 >
 > Consulta más lenta del catálogo: 0,13 s, muy por debajo del objetivo de 5 s (T027).
+>
+> La fase de convergencia (T029-T031) cerró los tres huecos detectados. El Principio V queda
+> como **excepción documentada**: se mantiene `snow sql -f` y el PAT vive en `.env` y `pat.txt`.
 
 ---
 
@@ -223,6 +226,6 @@ sin correcciones, y `snowflake/README.md` reflejando los dos scripts nuevos.
 
 ## Phase 7: Convergence
 
-- [ ] T029 **CRITICAL** Documentar la excepción aceptada al Principio V (decisión del equipo: se mantiene `snow sql -f`): registrar en `Complexity Tracking` de `specs/001-mock-sales-dataset/plan.md` que la puesta en marcha añade dos pasos (`pat.txt` y `snow connection add`) y que el PAT queda duplicado en `.env` y `pat.txt`, con la alternativa descartada (runner SQL en Python) y el motivo; corregir la fila del Principio V del Constitution Check para que refleje los cinco pasos reales; y dejar explícito en `specs/001-mock-sales-dataset/quickstart.md` y `snowflake/README.md` que `pat.txt` contiene un secreto, está en `.gitignore` y debe rotarse junto con `SNOWFLAKE_PAT` per Constitution V (partial)
-- [ ] T030 Añadir a `tests/test_dataset.py` un test que consulte `FACT_SALES` filtrando por una marca inexistente y verifique que devuelve cero filas sin lanzar error, cubriendo el edge case "combinaciones sin datos" que hoy sólo cubre Q-12 para el año fuera de rango per spec: Edge Cases (missing)
-- [ ] T031 Reconciliar el mapa de tests de `specs/001-mock-sales-dataset/contracts/dataset-contract.md` con los nombres reales: `test_row_counts` → `test_dimension_row_counts` + `test_fact_row_count`, `test_no_nulls` → `test_no_nulls_in_dimensions` + `test_no_nulls_in_fact`, y `test_closed_domains` → los cuatro tests de dominio cerrado per contracts/dataset-contract.md (partial)
+- [X] T029 **CRITICAL** Documentar la excepción aceptada al Principio V (decisión del equipo: se mantiene `snow sql -f`): registrar en `Complexity Tracking` de `specs/001-mock-sales-dataset/plan.md` que la puesta en marcha añade dos pasos (`pat.txt` y `snow connection add`) y que el PAT queda duplicado en `.env` y `pat.txt`, con la alternativa descartada (runner SQL en Python) y el motivo; corregir la fila del Principio V del Constitution Check para que refleje los cinco pasos reales; y dejar explícito en `specs/001-mock-sales-dataset/quickstart.md` y `snowflake/README.md` que `pat.txt` contiene un secreto, está en `.gitignore` y debe rotarse junto con `SNOWFLAKE_PAT` per Constitution V (partial)
+- [X] T030 Añadir a `tests/test_dataset.py` un test que consulte `FACT_SALES` filtrando por una marca inexistente y verifique que devuelve cero filas sin lanzar error, cubriendo el edge case "combinaciones sin datos" que hoy sólo cubre Q-12 para el año fuera de rango per spec: Edge Cases (missing)
+- [X] T031 Reconciliar el mapa de tests de `specs/001-mock-sales-dataset/contracts/dataset-contract.md` con los nombres reales: `test_row_counts` → `test_dimension_row_counts` + `test_fact_row_count`, `test_no_nulls` → `test_no_nulls_in_dimensions` + `test_no_nulls_in_fact`, y `test_closed_domains` → los cuatro tests de dominio cerrado per contracts/dataset-contract.md (partial)

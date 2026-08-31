@@ -30,11 +30,19 @@ el pipeline.
 2. Editar `manual/grant_user.sql` con tu usuario y ejecutarlo.
 3. Crear un PAT restringido al rol de la demo y rellenar `.env` a partir de `.env.example`
    (`SNOWFLAKE_PAT`, `SNOWFLAKE_ROLE=CICD_DEMO_ROLE`, `SNOWFLAKE_DATABASE=CICD_DEMO`).
-4. Desplegar el dataset:
+4. Guardar **el mismo** PAT en `pat.txt` en la raíz del repositorio y registrar la conexión
+   `cicd_demo` de la CLI apuntando a ese fichero (ver
+   [quickstart.md](../specs/001-mock-sales-dataset/quickstart.md)).
+5. Desplegar el dataset:
    ```powershell
    snow sql --connection cicd_demo -f snowflake/002_tables.sql
    snow sql --connection cicd_demo -f snowflake/003_seed.sql
    ```
+
+> ⚠️ **El PAT vive en dos ficheros**: `.env` (lo lee `pytest`) y `pat.txt` (lo lee `snow`). Los
+> dos están en `.gitignore` y contienen el secreto en texto plano. **Al rotarlo, actualiza los
+> dos.** Es una excepción consciente al Principio V de la constitución, justificada en
+> [plan.md](../specs/001-mock-sales-dataset/plan.md#complexity-tracking).
 
 ## Validar
 

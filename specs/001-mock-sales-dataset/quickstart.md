@@ -40,6 +40,13 @@ demo y la que replica el pipeline de CI.
    ```
    La ruta de `pat.txt` se resuelve **relativa al directorio desde el que lanzas `snow`**, así
    que ejecuta siempre los comandos desde la raíz del repositorio.
+
+   > ⚠️ **`pat.txt` contiene un secreto en texto plano.** Es el **mismo** token que
+   > `SNOWFLAKE_PAT` en `.env`: la CLI de Snowflake no lee `.env`, de ahí la duplicación. Ambos
+   > ficheros están en `.gitignore` y **nunca** deben commitearse ni compartirse por chat.
+   > **Al rotar el PAT hay que actualizar los dos a la vez**, o los tests y el despliegue
+   > dejarán de coincidir. La desviación respecto al Principio V está justificada en
+   > [plan.md](plan.md#complexity-tracking).
 5. Dependencias instaladas: `poetry install`.
 
 ## Desplegar
