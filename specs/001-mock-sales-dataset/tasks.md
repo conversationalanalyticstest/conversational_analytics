@@ -218,3 +218,11 @@ en el tiempo.
 
 Toda la suite en verde (incluidos los tests marcados `writes_db`), `quickstart.md` ejecutable
 sin correcciones, y `snowflake/README.md` reflejando los dos scripts nuevos.
+
+---
+
+## Phase 7: Convergence
+
+- [ ] T029 **CRITICAL** Eliminar la duplicación del PAT y reducir la puesta en marcha a los tres pasos del Principio V: añadir a `src/conversational_analytics/db.py` (o a un módulo hermano mínimo) la ejecución de un fichero `.sql` mediante `execute_string()` sobre la conexión de `.env`, sustituir los `snow sql -f` de `specs/001-mock-sales-dataset/quickstart.md` y de `snowflake/README.md` por ese comando, y retirar `pat.txt` y el requisito de `snow connection add` de ambos documentos per Constitution V (partial)
+- [ ] T030 Añadir a `tests/test_dataset.py` un test que consulte `FACT_SALES` filtrando por una marca inexistente y verifique que devuelve cero filas sin lanzar error, cubriendo el edge case "combinaciones sin datos" que hoy sólo cubre Q-12 para el año fuera de rango per spec: Edge Cases (missing)
+- [ ] T031 Reconciliar el mapa de tests de `specs/001-mock-sales-dataset/contracts/dataset-contract.md` con los nombres reales: `test_row_counts` → `test_dimension_row_counts` + `test_fact_row_count`, `test_no_nulls` → `test_no_nulls_in_dimensions` + `test_no_nulls_in_fact`, y `test_closed_domains` → los cuatro tests de dominio cerrado per contracts/dataset-contract.md (partial)
