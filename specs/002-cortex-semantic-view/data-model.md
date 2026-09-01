@@ -69,7 +69,7 @@ No hay ninguna otra relación posible entre las tres tablas: ambas claves forán
 | `PRODUCT` | `BRAND` | `BRAND` | 12 valores (catálogo abierto) | brand, product name |
 | `PRODUCT` | `THERAPEUTIC_AREA` | `THERAPEUTIC_AREA` | Cerrado, 5 valores (`IS_ENUM`) | therapeutic area, therapy area, specialty |
 | `PRODUCT` | `BUSINESS_UNIT` | `BUSINESS_UNIT` | Cerrado, 2 valores (`IS_ENUM`) | business unit, division |
-| `COUNTRY` | `COUNTRY_NAME` | `COUNTRY_NAME` | 10 valores (catálogo abierto) | country, market name |
+| `COUNTRY` | `COUNTRY_NAME` | `COUNTRY_NAME` | Cerrado, 10 valores **en español** (`IS_ENUM`) | country, market name |
 | `COUNTRY` | `REGION` | `REGION` | Cerrado, 4 valores (`IS_ENUM`) | region, commercial region, zone |
 | `SALE` | `CHANNEL` | `CHANNEL` | Cerrado, 3 valores (`IS_ENUM`) | channel, sales channel |
 | `SALE` | `MONTH` | `SALE_MONTH` | 36 meses, 2023-01 a 2025-12 | month, sales month, period |

@@ -179,6 +179,30 @@ por el usuario para evitar ambigüedad de resolución y mantener el modelo más 
 I). Traducir también `reference-questions.md` de la feature 001 — descartado porque ese
 catálogo es documentación de test ya cerrada, no se despliega en Snowflake ni lo ve el agente.
 
+## D-10: `COUNTRY_NAME` almacena valores en español
+
+**Decision**: Marcar `COUNTRY.COUNTRY_NAME` con `SAMPLE_VALUES` (los 10 nombres reales, en
+español: `Alemania`, `Espana`, `Estados Unidos`, etc.) e `IS_ENUM`, y documentarlo en el
+`COMMENT` en inglés ("Values are stored in Spanish...").
+
+**Rationale**: Al revisar `snowflake/003_seed.sql` (feature 001, ya cerrada) se confirma que
+`DIM_COUNTRY.COUNTRY_NAME` contiene los nombres de país en español (`Alemania`, no `Germany`),
+mientras que el resto del modelo semántico (nombres, sinónimos, preguntas) está en inglés
+(D-09). Cambiar los datos físicos está fuera de alcance de esta feature (no se toca ninguna
+tabla base, ver Summary de plan.md). La mitigación es documentar el hecho y darle a Cortex
+Analyst los valores exactos vía `SAMPLE_VALUES` + `IS_ENUM`, igual que con los demás dominios
+cerrados (D-05), para que una pregunta en inglés sobre "Germany" pueda resolverse igualmente
+si el modelo generaliza a partir del comentario y los valores de ejemplo — aunque no hay
+garantía total de que Cortex Analyst traduzca "Germany" → "Alemania" sin ayuda adicional
+(riesgo documentado, no resuelto del todo en esta feature).
+
+**Alternatives considered**: Añadir una dimensión derivada que traduzca los nombres al inglés
+con una expresión `CASE WHEN COUNTRY_NAME = 'Alemania' THEN 'Germany' ...`. Rechazada por ahora:
+duplica el catálogo de países dentro del DDL (12 líneas de `CASE`) por un problema que ya queda
+mitigado con `SAMPLE_VALUES` + `IS_ENUM`, y añade una fuente de verdad más que mantener
+sincronizada con `DIM_COUNTRY` — se prioriza Principio I. Queda anotado como mejora futura si
+en la validación real Cortex Analyst no resuelve bien nombres de país en inglés.
+
 ## Resumen de decisiones
 
 | # | Decisión | Requisito que satisface |
@@ -192,4 +216,5 @@ catálogo es documentación de test ya cerrada, no se despliega en Snowflake ni 
 | D-07 | Dimensiones derivadas de año y trimestre | Q-01, Q-04, Q-08, Q-10 |
 | D-08 | `AI_VERIFIED_QUERIES` con pregunta en inglés y SQL directo sobre tablas físicas | FR-008 |
 | D-09 | Identificadores/sinónimos/preguntas en inglés; documentación del repo en español | Aclaración del usuario, 2026-09-01 |
+| D-10 | `COUNTRY_NAME` marcado `IS_ENUM` con sus valores reales en español | Hallazgo en `003_seed.sql`, mitiga riesgo de FR-012/SC-001 |
 

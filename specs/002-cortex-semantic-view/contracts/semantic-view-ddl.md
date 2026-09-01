@@ -69,7 +69,9 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
       IS_ENUM,
     COUNTRY.COUNTRY_NAME AS COUNTRY_NAME
       WITH SYNONYMS ('country', 'market name')
-      COMMENT = 'Name of the country where the sale is recorded.',
+      COMMENT = 'Name of the country where the sale is recorded. Values are stored in Spanish (e.g. Alemania = Germany, Espana = Spain, Estados Unidos = United States).'
+      SAMPLE_VALUES ('Brasil', 'Canada', 'China', 'Alemania', 'Espana', 'Francia', 'Italia', 'Japon', 'Mexico', 'Estados Unidos')
+      IS_ENUM,
     COUNTRY.REGION AS REGION
       WITH SYNONYMS ('region', 'commercial region', 'zone')
       COMMENT = 'Commercial region the country belongs to.'
