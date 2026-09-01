@@ -43,8 +43,6 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
   )
 
   FACTS (
-    SALE.UNITS AS UNITS_SOLD
-      COMMENT = 'Units sold in the row (month x product x country x channel).',
     SALE.GROSS_AMOUNT AS GROSS_SALES_EUR
       COMMENT = 'Gross sales amount in euros, before discount, for the row.',
     SALE.DISCOUNT_AMOUNT AS DISCOUNT_EUR
@@ -94,7 +92,7 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
   )
 
   METRICS (
-    SALE.UNITS_SOLD AS SUM(SALE.UNITS)
+    SALE.UNITS_SOLD AS SUM(SALE.UNITS_SOLD)
       WITH SYNONYMS ('units', 'units sold', 'volume')
       COMMENT = 'Total units sold.',
     SALE.GROSS_SALES AS SUM(SALE.GROSS_AMOUNT)

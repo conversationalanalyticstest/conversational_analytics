@@ -20,6 +20,13 @@
 --   specs/002-cortex-semantic-view/contracts/semantic-view-ddl.md
 --
 -- Requiere haber ejecutado antes 002_tables.sql y 003_seed.sql.
+--
+-- Nota: SALE.UNITS_SOLD (metrica) referencia SUM(SALE.UNITS_SOLD) en vez de pasar por un
+-- fact intermedio, porque la columna fisica se llama igual (UNITS_SOLD) y Snowflake resuelve
+-- un nombre repetido siempre hacia el objeto semantico salvo en la autorreferencia de una
+-- metrica/dimension consigo misma (ver validation-rules, "Name resolution"), que es justo
+-- este caso. Un fact intermedio (SALE.UNITS AS UNITS_SOLD) produce un error de referencia
+-- ciclica al desplegar.
 -- =========================================================
 
 USE ROLE CICD_DEMO_ROLE;
@@ -49,8 +56,6 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
   )
 
   FACTS (
-    SALE.UNITS AS UNITS_SOLD
-      COMMENT = 'Units sold in the row (month x product x country x channel).',
     SALE.GROSS_AMOUNT AS GROSS_SALES_EUR
       COMMENT = 'Gross sales amount in euros, before discount, for the row.',
     SALE.DISCOUNT_AMOUNT AS DISCOUNT_EUR
@@ -100,7 +105,7 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
   )
 
   METRICS (
-    SALE.UNITS_SOLD AS SUM(SALE.UNITS)
+    SALE.UNITS_SOLD AS SUM(SALE.UNITS_SOLD)
       WITH SYNONYMS ('units', 'units sold', 'volume')
       COMMENT = 'Total units sold.',
     SALE.GROSS_SALES AS SUM(SALE.GROSS_AMOUNT)

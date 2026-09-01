@@ -37,7 +37,7 @@ erDiagram
         date MONTH "dimension = SALE_MONTH"
         number YEAR "dimension derivada = YEAR(SALE_MONTH)"
         number QUARTER "dimension derivada = QUARTER(SALE_MONTH)"
-        number UNITS "fact = UNITS_SOLD"
+        number UNITS_SOLD "metrica SUM directa, sin fact intermedio"
         number GROSS_AMOUNT "fact = GROSS_SALES_EUR"
         number DISCOUNT_AMOUNT "fact = DISCOUNT_EUR"
         number NET_AMOUNT "fact derivado = GROSS_AMOUNT - DISCOUNT_AMOUNT"
@@ -85,7 +85,6 @@ para no duplicar la fuente de verdad; se copian literalmente en el DDL
 
 | Tabla lógica | Fact (EN) | Expresión | Descripción de negocio |
 |---|---|---|---|
-| `SALE` | `UNITS` | `UNITS_SOLD` | Unidades vendidas en la fila. |
 | `SALE` | `GROSS_AMOUNT` | `GROSS_SALES_EUR` | Ventas brutas en euros, antes de descuento, en la fila. |
 | `SALE` | `DISCOUNT_AMOUNT` | `DISCOUNT_EUR` | Descuento en euros aplicado en la fila. |
 | `SALE` | `NET_AMOUNT` | `GROSS_AMOUNT - DISCOUNT_AMOUNT` | Ventas netas en euros de la fila. No almacenado físicamente (ver contrato del dataset). |
@@ -94,7 +93,7 @@ para no duplicar la fuente de verdad; se copian literalmente en el DDL
 
 | Tabla lógica | Métrica (EN) | Expresión | Sinónimos (EN) | Es la métrica por defecto de... |
 |---|---|---|---|---|
-| `SALE` | `UNITS_SOLD` | `SUM(UNITS)` | units, units sold, volume | — |
+| `SALE` | `UNITS_SOLD` | `SUM(SALE.UNITS_SOLD)` (referencia directa a la columna física; ver nota en el DDL) | units, units sold, volume | — |
 | `SALE` | `GROSS_SALES` | `SUM(GROSS_AMOUNT)` | gross sales, gross revenue | — |
 | `SALE` | `DISCOUNT` | `SUM(DISCOUNT_AMOUNT)` | discount, discounts, discount amount | — |
 | `SALE` | `NET_SALES` | `SUM(NET_AMOUNT)` | **sales**, net sales, **revenue** | "sales" sin cualificar (FR-012) |

@@ -59,15 +59,16 @@ atómica de este artefacto: ninguna historia de usuario puede validarse hasta qu
 
 **⚠️ CRITICAL**: Ninguna tarea de las fases 3-5 puede ejecutarse hasta completar esta fase.
 
-- [ ] T003 Desplegar `snowflake/004_semantic_view.sql` contra `CICD_DEMO.DATA` con
+- [X] T003 Desplegar `snowflake/004_semantic_view.sql` contra `CICD_DEMO.DATA` con
       `snow sql -f snowflake/004_semantic_view.sql --connection cicd_demo` (ver paso 1 de
-      [quickstart.md](./quickstart.md)). **Bloqueado** (2026-09-01): la CLI `snow` no consigue
-      conectar (`250001: Could not connect to Snowflake backend`) pese a que el TCP:443 al host
-      responde — pendiente de resolver con el usuario (VPN / vigencia del PAT).
-- [ ] T004 Verificar el despliegue con `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA;` y
+      [quickstart.md](./quickstart.md)). Desplegado (2026-09-01) tras añadir el grant
+      `CREATE SEMANTIC VIEW` en `001_bootstrap.sql` y corregir una referencia cíclica en la
+      definición de la métrica `UNITS_SOLD` (ver comentario en el propio DDL).
+- [X] T004 Verificar el despliegue con `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA;` y
       `DESCRIBE SEMANTIC VIEW CICD_DEMO.DATA.SV_PHARMA_SALES;` (paso 2 de quickstart.md),
       confirmando 3 tablas lógicas, 2 relaciones, 4 facts, 9 dimensiones y 6 métricas (SC-005,
-      ver [data-model.md](./data-model.md)).
+      ver [data-model.md](./data-model.md)). Verificado en vivo (2026-09-01): estructura
+      correcta, `METRIC UNITS_SOLD` resuelve a `SUM(SALE.UNITS_SOLD)` sin ciclo.
 
 **Checkpoint**: `SV_PHARMA_SALES` existe y tiene la estructura esperada — las historias de
 usuario pueden empezar a validarse.
@@ -162,15 +163,18 @@ huecos.
 
 **Purpose**: Cerrar la feature validando idempotencia, documentación y ejecución completa.
 
-- [ ] T017 Volver a ejecutar `snow sql -f snowflake/004_semantic_view.sql --connection
+- [X] T017 Volver a ejecutar `snow sql -f snowflake/004_semantic_view.sql --connection
       cicd_demo` y confirmar con `DESCRIBE SEMANTIC VIEW` que la estructura (recuento de
       tablas lógicas, dimensiones, métricas y relaciones) no cambia respecto a T004 (valida
-      SC-004, idempotencia de `CREATE OR ALTER`).
+      SC-004, idempotencia de `CREATE OR ALTER`). Confirmado (2026-09-01): segundo despliegue
+      exitoso (`Statement executed successfully.`) y `DESCRIBE SEMANTIC VIEW` idéntico al de
+      T004.
 - [X] T018 [P] Añadir una entrada para `004_semantic_view.sql` en `snowflake/README.md`,
       siguiendo el mismo formato que las entradas de `001_bootstrap.sql`/`002_tables.sql`/
       `003_seed.sql`.
-- [ ] T019 Ejecutar `py -m pytest tests/test_semantic_view.py -v` completo y confirmar que las
-      11 preguntas (T005-T016) y el caso de borde (T009) pasan (SC-001, SC-002).
+- [X] T019 Ejecutar `py -m pytest tests/test_semantic_view.py -v` completo y confirmar que las
+      11 preguntas (T005-T016) y el caso de borde (T009) pasan (SC-001, SC-002). Confirmado
+      (2026-09-01): 12/12 tests pasan contra Snowflake en vivo.
 - [X] T020 Commitear `snowflake/004_semantic_view.sql` y `tests/test_semantic_view.py` con
       mensaje `implement: despliega y valida la semantic view de ventas`.
 

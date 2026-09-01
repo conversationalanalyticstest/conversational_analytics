@@ -70,6 +70,6 @@ TO ROLE CICD_DEMO_ROLE;
 -- 6. Creacion de objetos
 -- ---------------------------------------------------------
 
-GRANT CREATE TABLE, CREATE VIEW
+GRANT CREATE TABLE, CREATE VIEW, CREATE SEMANTIC VIEW
 ON SCHEMA CICD_DEMO.DATA
 TO ROLE CICD_DEMO_ROLE;
