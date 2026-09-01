@@ -41,11 +41,11 @@ Proyecto único (ver "Project Structure" en [plan.md](./plan.md)):
 
 **Purpose**: Preparar el fichero DDL y el módulo de test antes de desplegar nada.
 
-- [ ] T001 Crear `snowflake/004_semantic_view.sql` copiando literalmente el bloque SQL de
+- [X] T001 Crear `snowflake/004_semantic_view.sql` copiando literalmente el bloque SQL de
       [contracts/semantic-view-ddl.md](./contracts/semantic-view-ddl.md) (desde `USE ROLE
       CICD_DEMO_ROLE;` hasta el `;` final de `AI_VERIFIED_QUERIES`), siguiendo la cabecera de
       estilo de `snowflake/002_tables.sql` (comentario de encabezado con feature y fecha).
-- [ ] T002 [P] Crear `tests/test_semantic_view.py` con el docstring de módulo (qué cubre, qué
+- [X] T002 [P] Crear `tests/test_semantic_view.py` con el docstring de módulo (qué cubre, qué
       fixtures usa, alcance), imports (`from __future__ import annotations`, `Callable`, `Any`),
       y las constantes `SCHEMA = "CICD_DEMO.DATA"` y `VIEW = "SV_PHARMA_SALES"`, sin casos de
       test todavía (se añaden en las fases de historia de usuario).
@@ -61,7 +61,9 @@ atómica de este artefacto: ninguna historia de usuario puede validarse hasta qu
 
 - [ ] T003 Desplegar `snowflake/004_semantic_view.sql` contra `CICD_DEMO.DATA` con
       `snow sql -f snowflake/004_semantic_view.sql --connection cicd_demo` (ver paso 1 de
-      [quickstart.md](./quickstart.md)).
+      [quickstart.md](./quickstart.md)). **Bloqueado** (2026-09-01): la CLI `snow` no consigue
+      conectar (`250001: Could not connect to Snowflake backend`) pese a que el TCP:443 al host
+      responde — pendiente de resolver con el usuario (VPN / vigencia del PAT).
 - [ ] T004 Verificar el despliegue con `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA;` y
       `DESCRIBE SEMANTIC VIEW CICD_DEMO.DATA.SV_PHARMA_SALES;` (paso 2 de quickstart.md),
       confirmando 3 tablas lógicas, 2 relaciones, 4 facts, 9 dimensiones y 6 métricas (SC-005,
@@ -87,19 +89,19 @@ tras completar la Fase 2 — no depende de las demás historias.
 > consulta SQL física equivalente ya usada en `tests/test_reference_questions.py` /
 > [contracts/verified-queries-mapping.md](./contracts/verified-queries-mapping.md).
 
-- [ ] T005 [P] [US1] Test `q01_total_net_sales_2025`: `DIMENSIONS SALE.YEAR METRICS
+- [X] T005 [P] [US1] Test `q01_total_net_sales_2025`: `DIMENSIONS SALE.YEAR METRICS
       SALE.NET_SALES` filtrado a `YEAR = 2025`, un único número `> 0`, en
       `tests/test_semantic_view.py`.
-- [ ] T006 [P] [US1] Test `q02_units_respiralia_germany_2024`: `DIMENSIONS PRODUCT.BRAND
+- [X] T006 [P] [US1] Test `q02_units_respiralia_germany_2024`: `DIMENSIONS PRODUCT.BRAND
       METRICS SALE.UNITS_SOLD` filtrado a marca `Respiralia`, país `DE` y año 2024, un único
       entero `> 0`, en `tests/test_semantic_view.py`.
-- [ ] T007 [P] [US1] Test `q08_net_sales_by_region_q4_2025`: `DIMENSIONS COUNTRY.REGION METRICS
+- [X] T007 [P] [US1] Test `q08_net_sales_by_region_q4_2025`: `DIMENSIONS COUNTRY.REGION METRICS
       SALE.NET_SALES` filtrado al cuarto trimestre de 2025, 4 filas todas `> 0`, en
       `tests/test_semantic_view.py`.
-- [ ] T008 [P] [US1] Test `q10_net_sales_hospital_oncology_2023`: filtro triple canal=Hospital,
+- [X] T008 [P] [US1] Test `q10_net_sales_hospital_oncology_2023`: filtro triple canal=Hospital,
       área terapéutica=Oncology, año=2023, un único número `> 0`, en
       `tests/test_semantic_view.py`.
-- [ ] T009 [US1] Test de borde (equivalente a Q-12): consulta por `YEAR = 2021` (fuera del
+- [X] T009 [US1] Test de borde (equivalente a Q-12): consulta por `YEAR = 2021` (fuera del
       histórico 2023-2025) devuelve cero filas, nunca un error ni una excepción, en
       `tests/test_semantic_view.py`.
 
@@ -117,16 +119,16 @@ de la Fase 3, aunque reutiliza el mismo objeto ya desplegado).
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] Test `q03_top5_brands_net_sales_europe`: `DIMENSIONS PRODUCT.BRAND METRICS
+- [X] T010 [P] [US2] Test `q03_top5_brands_net_sales_europe`: `DIMENSIONS PRODUCT.BRAND METRICS
       SALE.NET_SALES` filtrado a `REGION = Europe`, orden descendente, 5 filas con valores
       distintos, en `tests/test_semantic_view.py`.
-- [ ] T011 [P] [US2] Test `q04_business_unit_comparison_2025`: `DIMENSIONS
+- [X] T011 [P] [US2] Test `q04_business_unit_comparison_2025`: `DIMENSIONS
       PRODUCT.BUSINESS_UNIT METRICS SALE.NET_SALES` filtrado a 2025, 2 filas ambas `> 0`, en
       `tests/test_semantic_view.py`.
-- [ ] T012 [P] [US2] Test `q05_therapeutic_area_highest_growth`: comparar `SALE.NET_SALES` por
+- [X] T012 [P] [US2] Test `q05_therapeutic_area_highest_growth`: comparar `SALE.NET_SALES` por
       `PRODUCT.THERAPEUTIC_AREA` entre 2024 y 2025, una única área con variación no nula, en
       `tests/test_semantic_view.py`.
-- [ ] T013 [P] [US2] Test `q09_country_most_units_animal_health`: `DIMENSIONS
+- [X] T013 [P] [US2] Test `q09_country_most_units_animal_health`: `DIMENSIONS
       COUNTRY.COUNTRY_NAME METRICS SALE.UNITS_SOLD` filtrado a `BUSINESS_UNIT = 'Animal
       Health'`, un único país entero `> 0`, en `tests/test_semantic_view.py`.
 
@@ -143,12 +145,12 @@ huecos.
 
 ### Tests for User Story 3
 
-- [ ] T014 [P] [US3] Test `q06_monthly_evolution_cardiovex_spain_2025`: `DIMENSIONS SALE.MONTH
+- [X] T014 [P] [US3] Test `q06_monthly_evolution_cardiovex_spain_2025`: `DIMENSIONS SALE.MONTH
       METRICS SALE.UNITS_SOLD` filtrado a marca `Cardiovex`, país `ES`, año 2025 → 12 filas, una
       por mes, sin huecos, en `tests/test_semantic_view.py`.
-- [ ] T015 [P] [US3] Test `q07_channel_highest_discount_rate`: `DIMENSIONS SALE.CHANNEL METRICS
+- [X] T015 [P] [US3] Test `q07_channel_highest_discount_rate`: `DIMENSIONS SALE.CHANNEL METRICS
       AVG_DISCOUNT_RATE` → 1 canal, ratio entre 0 y 0.40, en `tests/test_semantic_view.py`.
-- [ ] T016 [P] [US3] Test `q11_avg_monthly_net_sales_per_product_latam`: `DIMENSIONS
+- [X] T016 [P] [US3] Test `q11_avg_monthly_net_sales_per_product_latam`: `DIMENSIONS
       PRODUCT.BRAND METRICS SALE.AVG_NET_SALES` filtrado a `REGION = LATAM` → 12 filas, todas
       `> 0`, en `tests/test_semantic_view.py`.
 
@@ -164,12 +166,12 @@ huecos.
       cicd_demo` y confirmar con `DESCRIBE SEMANTIC VIEW` que la estructura (recuento de
       tablas lógicas, dimensiones, métricas y relaciones) no cambia respecto a T004 (valida
       SC-004, idempotencia de `CREATE OR ALTER`).
-- [ ] T018 [P] Añadir una entrada para `004_semantic_view.sql` en `snowflake/README.md`,
+- [X] T018 [P] Añadir una entrada para `004_semantic_view.sql` en `snowflake/README.md`,
       siguiendo el mismo formato que las entradas de `001_bootstrap.sql`/`002_tables.sql`/
       `003_seed.sql`.
 - [ ] T019 Ejecutar `py -m pytest tests/test_semantic_view.py -v` completo y confirmar que las
       11 preguntas (T005-T016) y el caso de borde (T009) pasan (SC-001, SC-002).
-- [ ] T020 Commitear `snowflake/004_semantic_view.sql` y `tests/test_semantic_view.py` con
+- [X] T020 Commitear `snowflake/004_semantic_view.sql` y `tests/test_semantic_view.py` con
       mensaje `implement: despliega y valida la semantic view de ventas`.
 
 ---

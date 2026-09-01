@@ -12,8 +12,9 @@ Se ejecutan en orden. Deben ser **idempotentes** y no contener datos de una cuen
 | [001_bootstrap.sql](001_bootstrap.sql) | Rol, base de datos, schemas y grants base |
 | [002_tables.sql](002_tables.sql) | Estructura del dataset mock: `DIM_PRODUCT`, `DIM_COUNTRY` y `FACT_SALES` |
 | [003_seed.sql](003_seed.sql) | Carga del dataset mock: 12 productos, 10 países y 12.960 ventas mensuales, generadas de forma determinista |
+| [004_semantic_view.sql](004_semantic_view.sql) | Semantic view `SV_PHARMA_SALES` para Cortex Analyst (`CREATE OR ALTER SEMANTIC VIEW`) |
 
-Pendientes (aún no creados): `004_semantic_view.sql`, `005_agent.sql`.
+Pendiente (aún no creado): `005_agent.sql`.
 
 ## Scripts manuales (`manual/`)
 
@@ -33,10 +34,11 @@ el pipeline.
 4. Guardar **el mismo** PAT en `pat.txt` en la raíz del repositorio y registrar la conexión
    `cicd_demo` de la CLI apuntando a ese fichero (ver
    [quickstart.md](../specs/001-mock-sales-dataset/quickstart.md)).
-5. Desplegar el dataset:
+5. Desplegar el dataset y la semantic view:
    ```powershell
    snow sql --connection cicd_demo -f snowflake/002_tables.sql
    snow sql --connection cicd_demo -f snowflake/003_seed.sql
+   snow sql --connection cicd_demo -f snowflake/004_semantic_view.sql
    ```
 
 > ⚠️ **El PAT vive en dos ficheros**: `.env` (lo lee `pytest`) y `pat.txt` (lo lee `snow`). Los
