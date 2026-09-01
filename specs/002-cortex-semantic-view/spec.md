@@ -101,7 +101,7 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
 - Pregunta por una métrica de negocio no cubierta por el modelo (p. ej. "cuota de mercado") →
   fuera de alcance; el modelo no debe inventar una métrica no derivable de las columnas
   existentes.
-- Pregunta que usa "sales" o un sinónimo ("revenue", "turnover") sin especificar que son
+- Pregunta que usa "sales" o un sinónimo ("revenue") sin especificar que son
   brutas ("gross") → el modelo MUST resolverla hacia ventas netas por defecto (FR-012), nunca
   hacia ambas cifras a la vez ni dejando la métrica sin resolver.
 
@@ -129,7 +129,7 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   dimensión y métrica, dado que las preguntas del agente y el resto de la plataforma operan en
   inglés.
 - **FR-007**: El modelo MUST incluir sinónimos de negocio habituales **en inglés** (p. ej.
-  "revenue" o "turnover" para sales, "discount" para discount, "brand" para brand) que ayuden a
+  "revenue" para sales, "discount" para discount, "brand" para brand) que ayuden a
   interpretar preguntas formuladas de distintas maneras.
 - **FR-008**: El sistema MUST incluir un conjunto de preguntas verificadas representativas
   (una por cada pregunta en rango del catálogo de referencia, Q-01 a Q-11) para mejorar la
@@ -147,7 +147,7 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   SDK), sin que dicha herramienta necesite conocer el SQL subyacente ni los nombres físicos de
   columna.
 - **FR-012**: Ante una pregunta que use "sales" o cualquiera de sus sinónimos de negocio
-  ("revenue", "turnover") sin especificar explícitamente "gross", el modelo MUST resolverla
+  ("revenue") sin especificar explícitamente "gross", el modelo MUST resolverla
   hacia la métrica de ventas netas ("net sales"). Sólo cuando la pregunta mencione
   explícitamente "gross" (o sinónimo equivalente) MUST resolverse hacia ventas brutas.
 
@@ -179,7 +179,7 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   modelo semántico, nunca un error.
 - **SC-003**: El 100% de los sinónimos de negocio definidos (en inglés) resuelve sin
   ambigüedad a una única dimensión o métrica del modelo, incluyendo que "sales" (y sus
-  sinónimos "revenue"/"turnover") sin más especificación resuelve siempre a ventas netas
+  sinónimo "revenue") sin más especificación resuelve siempre a ventas netas
   ("net sales").
 - **SC-004**: Volver a desplegar el artefacto de la semantic view sobre un esquema ya
   desplegado no produce diferencias de definición (recuento de tablas lógicas, dimensiones,
@@ -211,5 +211,5 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
 - El acceso y despliegue de la semantic view usa el mismo rol (`CICD_DEMO_ROLE`) y warehouse
   (`COMPUTE_WH`) que las tablas base, sin permisos adicionales.
 - "Ventas netas" (`NET_SALES`) es la métrica de negocio por defecto: cualquier pregunta que
-  diga "sales" o un sinónimo ("revenue", "turnover") sin cualificar "gross" se resuelve hacia
+  diga "sales" o un sinónimo ("revenue") sin cualificar "gross" se resuelve hacia
   ventas netas.

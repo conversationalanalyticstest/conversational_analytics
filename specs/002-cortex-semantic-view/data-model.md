@@ -97,7 +97,7 @@ para no duplicar la fuente de verdad; se copian literalmente en el DDL
 | `SALE` | `UNITS_SOLD` | `SUM(UNITS)` | units, units sold, volume | — |
 | `SALE` | `GROSS_SALES` | `SUM(GROSS_AMOUNT)` | gross sales, gross revenue | — |
 | `SALE` | `DISCOUNT` | `SUM(DISCOUNT_AMOUNT)` | discount, discounts, discount amount | — |
-| `SALE` | `NET_SALES` | `SUM(NET_AMOUNT)` | **sales**, net sales, **revenue**, **turnover** | "sales" sin cualificar (FR-012) |
+| `SALE` | `NET_SALES` | `SUM(NET_AMOUNT)` | **sales**, net sales, **revenue** | "sales" sin cualificar (FR-012) |
 | `SALE` | `AVG_NET_SALES` | `AVG(NET_AMOUNT)` | average net sales, average sales | — |
 | *(derivada, sin tabla)* | `AVG_DISCOUNT_RATE` | `DIV0(SALE.DISCOUNT, SALE.GROSS_SALES)` | discount rate, average discount rate, discount percentage | — |
 

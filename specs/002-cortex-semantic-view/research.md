@@ -61,7 +61,7 @@ por duplicación.
 
 ## D-04: Métrica de negocio por defecto para "sales" (FR-012)
 
-**Decision**: El sinónimo `'sales'` (y sus equivalentes `'revenue'`, `'turnover'`) se asigna
+**Decision**: El sinónimo `'sales'` (y su equivalente `'revenue'`) se asigna
 **únicamente** a la métrica `SALE.NET_SALES`. La métrica `SALE.GROSS_SALES` solo lleva
 sinónimos que mencionan explícitamente "gross" (`'gross sales'`, `'gross revenue'`).
 

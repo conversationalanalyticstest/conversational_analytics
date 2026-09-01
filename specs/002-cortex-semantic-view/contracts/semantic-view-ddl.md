@@ -102,7 +102,7 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
       WITH SYNONYMS ('discount', 'discounts', 'discount amount')
       COMMENT = 'Total discount granted, in euros.',
     SALE.NET_SALES AS SUM(SALE.NET_AMOUNT)
-      WITH SYNONYMS ('sales', 'net sales', 'revenue', 'turnover')
+      WITH SYNONYMS ('sales', 'net sales', 'revenue')
       COMMENT = 'Total net sales in euros (gross minus discount). Default business metric for unqualified "sales".',
     SALE.AVG_NET_SALES AS AVG(SALE.NET_AMOUNT)
       WITH SYNONYMS ('average net sales', 'average sales')
