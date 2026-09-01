@@ -101,8 +101,9 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
 - Pregunta por una métrica de negocio no cubierta por el modelo (p. ej. "cuota de mercado") →
   fuera de alcance; el modelo no debe inventar una métrica no derivable de las columnas
   existentes.
-- Pregunta ambigua que podría referirse a ventas brutas o netas (p. ej. "ventas") → el modelo
-  debe resolverla hacia una métrica de negocio concreta y documentada (no ambas a la vez).
+- Pregunta que usa "ventas" o un sinónimo (ingresos, facturación) sin especificar que son
+  brutas → el modelo MUST resolverla hacia ventas netas por defecto (FR-012), nunca hacia
+  ambas cifras a la vez ni dejando la métrica sin resolver.
 
 ## Requirements *(mandatory)*
 
@@ -143,6 +144,10 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   datos por una herramienta externa (una tool que use Cortex Analyst desde el OpenAI Agents
   SDK), sin que dicha herramienta necesite conocer el SQL subyacente ni los nombres físicos de
   columna.
+- **FR-012**: Ante una pregunta que use "ventas" o cualquiera de sus sinónimos de negocio
+  (ingresos, facturación) sin especificar explícitamente "brutas", el modelo MUST resolverla
+  hacia la métrica de ventas netas. Sólo cuando la pregunta mencione explícitamente "brutas"
+  (o sinónimo equivalente) MUST resolverse hacia ventas brutas.
 
 ### Key Entities
 
@@ -167,7 +172,8 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
 - **SC-002**: La pregunta fuera de rango del catálogo (Q-12) devuelve cero filas a través del
   modelo semántico, nunca un error.
 - **SC-003**: El 100% de los sinónimos de negocio definidos resuelve sin ambigüedad a una única
-  dimensión o métrica del modelo.
+  dimensión o métrica del modelo, incluyendo que "ventas" (y sus sinónimos) sin más
+  especificación resuelve siempre a ventas netas.
 - **SC-004**: Volver a desplegar el artefacto de la semantic view sobre un esquema ya
   desplegado no produce diferencias de definición (recuento de tablas lógicas, dimensiones,
   métricas y joins idéntico antes y después).
@@ -194,3 +200,5 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   artefacto de la semantic view.
 - El acceso y despliegue de la semantic view usa el mismo rol (`CICD_DEMO_ROLE`) y warehouse
   (`COMPUTE_WH`) que las tablas base, sin permisos adicionales.
+- "Ventas netas" es la métrica de negocio por defecto: cualquier pregunta que diga "ventas" o
+  un sinónimo (ingresos, facturación) sin cualificar "brutas" se resuelve hacia ventas netas.
