@@ -54,21 +54,23 @@ VALUES
 
 -- ---------------------------------------------------------
 -- DIM_COUNTRY
--- Sin tildes ni enie: los .sql se ejecutan desde consolas Windows en cp1252.
+-- Nombres de pais en ingles (consistente con la semantic view de Cortex,
+-- feature 002-cortex-semantic-view). Sin tildes ni enie de todos modos: los
+-- .sql se ejecutan desde consolas Windows en cp1252.
 -- ---------------------------------------------------------
 
 INSERT INTO DIM_COUNTRY (COUNTRY_CODE, COUNTRY_NAME, REGION)
 VALUES
-    ('BR', 'Brasil',         'LATAM'),
-    ('CA', 'Canada',         'North America'),
-    ('CN', 'China',          'APAC'),
-    ('DE', 'Alemania',       'Europe'),
-    ('ES', 'Espana',         'Europe'),
-    ('FR', 'Francia',        'Europe'),
-    ('IT', 'Italia',         'Europe'),
-    ('JP', 'Japon',          'APAC'),
-    ('MX', 'Mexico',         'LATAM'),
-    ('US', 'Estados Unidos', 'North America');
+    ('BR', 'Brazil',        'LATAM'),
+    ('CA', 'Canada',        'North America'),
+    ('CN', 'China',         'APAC'),
+    ('DE', 'Germany',       'Europe'),
+    ('ES', 'Spain',         'Europe'),
+    ('FR', 'France',        'Europe'),
+    ('IT', 'Italy',         'Europe'),
+    ('JP', 'Japan',         'APAC'),
+    ('MX', 'Mexico',        'LATAM'),
+    ('US', 'United States', 'North America');
 
 
 -- =========================================================

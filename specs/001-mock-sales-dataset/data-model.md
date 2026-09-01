@@ -77,7 +77,7 @@ erDiagram
 | Columna | Tipo | Nulos | Descripción |
 |---|---|---|---|
 | `COUNTRY_CODE` | `CHAR(2)` | NOT NULL, PK | ISO-3166 alpha-2 |
-| `COUNTRY_NAME` | `VARCHAR(40)` | NOT NULL | Nombre en castellano |
+| `COUNTRY_NAME` | `VARCHAR(40)` | NOT NULL | Nombre en inglés (consistente con la semantic view, feature 002) |
 | `REGION` | `VARCHAR(20)` | NOT NULL | Dominio cerrado (4 valores) |
 
 ### Datos
@@ -87,16 +87,16 @@ de `003_seed.sql` (ver [research D-08](research.md)).
 
 | COUNTRY_CODE | COUNTRY_NAME | REGION | `c` |
 |---|---|---|---|
-| BR | Brasil | LATAM | 1 |
+| BR | Brazil | LATAM | 1 |
 | CA | Canada | North America | 2 |
 | CN | China | APAC | 3 |
-| DE | Alemania | Europe | 4 |
-| ES | Espana | Europe | 5 |
-| FR | Francia | Europe | 6 |
-| IT | Italia | Europe | 7 |
-| JP | Japon | APAC | 8 |
+| DE | Germany | Europe | 4 |
+| ES | Spain | Europe | 5 |
+| FR | France | Europe | 6 |
+| IT | Italy | Europe | 7 |
+| JP | Japan | APAC | 8 |
 | MX | Mexico | LATAM | 9 |
-| US | Estados Unidos | North America | 10 |
+| US | United States | North America | 10 |
 
 > Sin tildes ni `ñ` a propósito: evita problemas de codificación al ejecutar los `.sql` desde
 > una consola Windows en cp1252 (ver restricciones del entorno).
