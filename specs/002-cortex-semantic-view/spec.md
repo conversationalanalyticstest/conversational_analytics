@@ -101,9 +101,9 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
 - Pregunta por una métrica de negocio no cubierta por el modelo (p. ej. "cuota de mercado") →
   fuera de alcance; el modelo no debe inventar una métrica no derivable de las columnas
   existentes.
-- Pregunta que usa "ventas" o un sinónimo (ingresos, facturación) sin especificar que son
-  brutas → el modelo MUST resolverla hacia ventas netas por defecto (FR-012), nunca hacia
-  ambas cifras a la vez ni dejando la métrica sin resolver.
+- Pregunta que usa "sales" o un sinónimo ("revenue", "turnover") sin especificar que son
+  brutas ("gross") → el modelo MUST resolverla hacia ventas netas por defecto (FR-012), nunca
+  hacia ambas cifras a la vez ni dejando la métrica sin resolver.
 
 ## Requirements *(mandatory)*
 
@@ -124,10 +124,12 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
 - **FR-005**: El modelo MUST exponer como métricas de negocio, como mínimo: unidades vendidas,
   ventas brutas, descuento y ventas netas (esta última derivada como ventas brutas menos
   descuento, nunca almacenada).
-- **FR-006**: El modelo MUST incluir nombres y descripciones en lenguaje de negocio (no nombres
-  técnicos de columna) para cada tabla lógica, dimensión y métrica.
-- **FR-007**: El modelo MUST incluir sinónimos de negocio habituales (p. ej. "ingresos" o
-  "facturación" para ventas, "descuento" para discount, "marca" para brand) que ayuden a
+- **FR-006**: El modelo MUST incluir nombres y descripciones en lenguaje de negocio **en
+  inglés** (no nombres técnicos de columna ni abreviaturas de esquema) para cada tabla lógica,
+  dimensión y métrica, dado que las preguntas del agente y el resto de la plataforma operan en
+  inglés.
+- **FR-007**: El modelo MUST incluir sinónimos de negocio habituales **en inglés** (p. ej.
+  "revenue" o "turnover" para sales, "discount" para discount, "brand" para brand) que ayuden a
   interpretar preguntas formuladas de distintas maneras.
 - **FR-008**: El sistema MUST incluir un conjunto de preguntas verificadas representativas
   (una por cada pregunta en rango del catálogo de referencia, Q-01 a Q-11) para mejorar la
@@ -144,23 +146,27 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   datos por una herramienta externa (una tool que use Cortex Analyst desde el OpenAI Agents
   SDK), sin que dicha herramienta necesite conocer el SQL subyacente ni los nombres físicos de
   columna.
-- **FR-012**: Ante una pregunta que use "ventas" o cualquiera de sus sinónimos de negocio
-  (ingresos, facturación) sin especificar explícitamente "brutas", el modelo MUST resolverla
-  hacia la métrica de ventas netas. Sólo cuando la pregunta mencione explícitamente "brutas"
-  (o sinónimo equivalente) MUST resolverse hacia ventas brutas.
+- **FR-012**: Ante una pregunta que use "sales" o cualquiera de sus sinónimos de negocio
+  ("revenue", "turnover") sin especificar explícitamente "gross", el modelo MUST resolverla
+  hacia la métrica de ventas netas ("net sales"). Sólo cuando la pregunta mencione
+  explícitamente "gross" (o sinónimo equivalente) MUST resolverse hacia ventas brutas.
 
 ### Key Entities
 
-- **Producto (tabla lógica dimensión)**: representa el catálogo de productos vendidos. Atributos
-  de negocio relevantes: marca, área terapéutica y unidad de negocio a la que pertenece.
-  Corresponde a `DIM_PRODUCT`.
-- **Mercado / País (tabla lógica dimensión)**: representa los países donde se vende. Atributos
-  de negocio relevantes: nombre del país y región comercial a la que pertenece. Corresponde a
-  `DIM_COUNTRY`.
-- **Venta mensual (tabla lógica de hechos)**: representa la actividad de ventas al grano mes ×
-  producto × país × canal. Atributos de negocio relevantes: mes, canal de venta, unidades
-  vendidas, ventas brutas y descuento; relacionada con Producto y con Mercado/País. Corresponde
-  a `FACT_SALES`.
+- **Producto / `PRODUCT` (tabla lógica dimensión)**: representa el catálogo de productos
+  vendidos. Atributos de negocio relevantes: marca (`BRAND`), área terapéutica
+  (`THERAPEUTIC_AREA`) y unidad de negocio (`BUSINESS_UNIT`) a la que pertenece. Corresponde a
+  `DIM_PRODUCT`.
+- **Mercado / País / `COUNTRY` (tabla lógica dimensión)**: representa los países donde se
+  vende. Atributos de negocio relevantes: nombre del país (`COUNTRY_NAME`) y región comercial
+  (`REGION`) a la que pertenece. Corresponde a `DIM_COUNTRY`.
+- **Venta mensual / `SALE` (tabla lógica de hechos)**: representa la actividad de ventas al
+  grano mes × producto × país × canal. Atributos de negocio relevantes: mes (`MONTH`), canal de
+  venta (`CHANNEL`), unidades vendidas, ventas brutas y descuento; relacionada con `PRODUCT` y
+  con `COUNTRY`. Corresponde a `FACT_SALES`.
+
+> Los nombres entre backticks son los identificadores en inglés que usará el modelo semántico
+> (ver [plan.md](./plan.md)); la narrativa de este documento se mantiene en español.
 
 ## Success Criteria *(mandatory)*
 
@@ -171,9 +177,10 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   sobre las tablas base.
 - **SC-002**: La pregunta fuera de rango del catálogo (Q-12) devuelve cero filas a través del
   modelo semántico, nunca un error.
-- **SC-003**: El 100% de los sinónimos de negocio definidos resuelve sin ambigüedad a una única
-  dimensión o métrica del modelo, incluyendo que "ventas" (y sus sinónimos) sin más
-  especificación resuelve siempre a ventas netas.
+- **SC-003**: El 100% de los sinónimos de negocio definidos (en inglés) resuelve sin
+  ambigüedad a una única dimensión o métrica del modelo, incluyendo que "sales" (y sus
+  sinónimos "revenue"/"turnover") sin más especificación resuelve siempre a ventas netas
+  ("net sales").
 - **SC-004**: Volver a desplegar el artefacto de la semantic view sobre un esquema ya
   desplegado no produce diferencias de definición (recuento de tablas lógicas, dimensiones,
   métricas y joins idéntico antes y después).
@@ -192,13 +199,17 @@ que los ratios calculados están en el rango válido (0-40% de descuento).
   divisa.
 - El eje temporal expuesto tiene grano nativo mensual (`SALE_MONTH`); agregaciones a trimestre
   o año se resuelven sobre ese grano, sin tabla de calendario adicional.
-- Los sinónimos de negocio cubren tanto términos en castellano como los valores en inglés ya
-  presentes en los datos (p. ej. "Hospital", "Retail Pharmacy", "Human Pharma"), reflejando
-  cómo el equipo ya trabaja en ambos idiomas.
+- Los nombres de tablas lógicas, dimensiones, métricas, sus sinónimos y las preguntas de
+  `AI_VERIFIED_QUERIES` están **en inglés** (igual que los valores ya presentes en los datos,
+  p. ej. "Hospital", "Retail Pharmacy", "Human Pharma", y que el resto de la plataforma
+  conversacional). La documentación de este repositorio (specs, plan, comentarios de PR, etc.)
+  se sigue redactando en español; solo el artefacto orientado al agente y a quien lo consulta
+  usa inglés.
 - La integración real con la tool del OpenAI Agents SDK y el agente conversacional es una
   feature futura y queda fuera de alcance aquí: esta feature entrega y valida únicamente el
   artefacto de la semantic view.
 - El acceso y despliegue de la semantic view usa el mismo rol (`CICD_DEMO_ROLE`) y warehouse
   (`COMPUTE_WH`) que las tablas base, sin permisos adicionales.
-- "Ventas netas" es la métrica de negocio por defecto: cualquier pregunta que diga "ventas" o
-  un sinónimo (ingresos, facturación) sin cualificar "brutas" se resuelve hacia ventas netas.
+- "Ventas netas" (`NET_SALES`) es la métrica de negocio por defecto: cualquier pregunta que
+  diga "sales" o un sinónimo ("revenue", "turnover") sin cualificar "gross" se resuelve hacia
+  ventas netas.

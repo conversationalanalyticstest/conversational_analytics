@@ -6,6 +6,10 @@ Este es el contrato ejecutable de la feature: el `CREATE OR ALTER SEMANTIC VIEW`
 `speckit-implement` copiará (sin cambios de fondo) a `snowflake/004_semantic_view.sql`. Sintaxis
 validada contra la documentación oficial de Snowflake (ver [research.md](../research.md)).
 
+> **Idioma**: nombres de tablas lógicas, dimensiones, facts, métricas, sinónimos, comentarios
+> (`COMMENT`) y el texto `QUESTION` de cada `AI_VERIFIED_QUERIES` van **en inglés** (decisión
+> D-09 de research.md); solo esta explicación alrededor del bloque SQL está en español.
+
 Los valores de `SAMPLE_VALUES` para los dominios cerrados están copiados literalmente de
 [data-model.md de la feature 001](../../001-mock-sales-dataset/data-model.md); si ese dominio
 cambia alguna vez, este fichero debe actualizarse en la misma PR (ver "Ampliar el catálogo" en
@@ -16,226 +20,226 @@ USE ROLE CICD_DEMO_ROLE;
 USE WAREHOUSE COMPUTE_WH;
 USE SCHEMA CICD_DEMO.DATA;
 
-CREATE OR ALTER SEMANTIC VIEW SV_VENTAS_FARMA
+CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
 
   TABLES (
-    PRODUCTO AS DIM_PRODUCT
+    PRODUCT AS DIM_PRODUCT
       PRIMARY KEY (PRODUCT_ID)
-      WITH SYNONYMS ('productos', 'catalogo de productos', 'medicamentos')
-      COMMENT = 'Catalogo de productos farmaceuticos y de salud animal vendidos. Cada producto pertenece a una marca, un area terapeutica y una unidad de negocio.',
-    PAIS AS DIM_COUNTRY
+      WITH SYNONYMS ('products', 'product catalog', 'medicines')
+      COMMENT = 'Catalog of pharmaceutical and animal health products sold. Each product belongs to a brand, a therapeutic area and a business unit.',
+    COUNTRY AS DIM_COUNTRY
       PRIMARY KEY (COUNTRY_CODE)
-      WITH SYNONYMS ('paises', 'mercados', 'mercado')
-      COMMENT = 'Catalogo de paises donde se vende. Cada pais pertenece a una region comercial.',
-    VENTA AS FACT_SALES
+      WITH SYNONYMS ('countries', 'markets', 'market')
+      COMMENT = 'Catalog of countries where products are sold. Each country belongs to a commercial region.',
+    SALE AS FACT_SALES
       PRIMARY KEY (SALE_MONTH, PRODUCT_ID, COUNTRY_CODE, CHANNEL)
-      WITH SYNONYMS ('ventas', 'transacciones de venta', 'actividad comercial')
-      COMMENT = 'Ventas mensuales por producto, pais y canal. Grano: mes x producto x pais x canal.'
+      WITH SYNONYMS ('sales', 'sales transactions', 'commercial activity')
+      COMMENT = 'Monthly sales by product, country and channel. Grain: month x product x country x channel.'
   )
 
   RELATIONSHIPS (
-    VENTA_A_PRODUCTO AS VENTA (PRODUCT_ID) REFERENCES PRODUCTO,
-    VENTA_A_PAIS AS VENTA (COUNTRY_CODE) REFERENCES PAIS
+    SALE_TO_PRODUCT AS SALE (PRODUCT_ID) REFERENCES PRODUCT,
+    SALE_TO_COUNTRY AS SALE (COUNTRY_CODE) REFERENCES COUNTRY
   )
 
   FACTS (
-    VENTA.UNIDADES AS UNITS_SOLD
-      COMMENT = 'Unidades vendidas en la fila (mes x producto x pais x canal).',
-    VENTA.IMPORTE_BRUTO AS GROSS_SALES_EUR
-      COMMENT = 'Ventas brutas en euros, antes de descuento, en la fila.',
-    VENTA.IMPORTE_DESCUENTO AS DISCOUNT_EUR
-      COMMENT = 'Descuento en euros aplicado en la fila.',
-    VENTA.IMPORTE_NETO AS GROSS_SALES_EUR - DISCOUNT_EUR
-      COMMENT = 'Ventas netas en euros de la fila (bruto menos descuento). No esta almacenado fisicamente; se calcula siempre a partir de las dos columnas anteriores.'
+    SALE.UNITS AS UNITS_SOLD
+      COMMENT = 'Units sold in the row (month x product x country x channel).',
+    SALE.GROSS_AMOUNT AS GROSS_SALES_EUR
+      COMMENT = 'Gross sales amount in euros, before discount, for the row.',
+    SALE.DISCOUNT_AMOUNT AS DISCOUNT_EUR
+      COMMENT = 'Discount amount in euros applied to the row.',
+    SALE.NET_AMOUNT AS GROSS_SALES_EUR - DISCOUNT_EUR
+      COMMENT = 'Net sales amount in euros for the row (gross minus discount). Not physically stored; always computed from the two columns above.'
   )
 
   DIMENSIONS (
-    PRODUCTO.MARCA AS BRAND
-      WITH SYNONYMS ('marca', 'producto', 'nombre comercial')
-      COMMENT = 'Marca comercial del producto.',
-    PRODUCTO.AREA_TERAPEUTICA AS THERAPEUTIC_AREA
-      WITH SYNONYMS ('area terapeutica', 'categoria terapeutica', 'especialidad')
-      COMMENT = 'Area terapeutica a la que pertenece el producto.'
+    PRODUCT.BRAND AS BRAND
+      WITH SYNONYMS ('brand', 'product name')
+      COMMENT = 'Commercial brand of the product.',
+    PRODUCT.THERAPEUTIC_AREA AS THERAPEUTIC_AREA
+      WITH SYNONYMS ('therapeutic area', 'therapy area', 'specialty')
+      COMMENT = 'Therapeutic area the product belongs to.'
       SAMPLE_VALUES ('Cardiometabolic', 'Respiratory', 'Oncology', 'Central Nervous System', 'Animal Health')
       IS_ENUM,
-    PRODUCTO.UNIDAD_NEGOCIO AS BUSINESS_UNIT
-      WITH SYNONYMS ('unidad de negocio', 'linea de negocio', 'division')
-      COMMENT = 'Unidad de negocio del producto: salud humana o salud animal.'
+    PRODUCT.BUSINESS_UNIT AS BUSINESS_UNIT
+      WITH SYNONYMS ('business unit', 'line of business', 'division')
+      COMMENT = 'Business unit of the product: human health or animal health.'
       SAMPLE_VALUES ('Human Pharma', 'Animal Health')
       IS_ENUM,
-    PAIS.NOMBRE_PAIS AS COUNTRY_NAME
-      WITH SYNONYMS ('pais', 'mercado', 'nombre del pais')
-      COMMENT = 'Nombre del pais donde se registra la venta.',
-    PAIS.REGION AS REGION
-      WITH SYNONYMS ('region', 'region comercial', 'zona')
-      COMMENT = 'Region comercial a la que pertenece el pais.'
+    COUNTRY.COUNTRY_NAME AS COUNTRY_NAME
+      WITH SYNONYMS ('country', 'market name')
+      COMMENT = 'Name of the country where the sale is recorded.',
+    COUNTRY.REGION AS REGION
+      WITH SYNONYMS ('region', 'commercial region', 'zone')
+      COMMENT = 'Commercial region the country belongs to.'
       SAMPLE_VALUES ('Europe', 'North America', 'LATAM', 'APAC')
       IS_ENUM,
-    VENTA.CANAL AS CHANNEL
-      WITH SYNONYMS ('canal', 'canal de venta', 'via de venta')
-      COMMENT = 'Canal a traves del cual se vendio: hospital, farmacia/tienda especializada o mayorista.'
+    SALE.CHANNEL AS CHANNEL
+      WITH SYNONYMS ('channel', 'sales channel')
+      COMMENT = 'Channel through which the sale happened: hospital, retail/specialty pharmacy or distributor.'
       SAMPLE_VALUES ('Hospital', 'Retail Pharmacy', 'Distributor')
       IS_ENUM,
-    VENTA.MES AS SALE_MONTH
-      WITH SYNONYMS ('mes', 'mes de venta', 'periodo')
-      COMMENT = 'Primer dia del mes de la venta. Historico de 2023-01 a 2025-12.',
-    VENTA.ANIO AS YEAR(SALE_MONTH)
-      WITH SYNONYMS ('anio', 'ano')
-      COMMENT = 'Anio de la venta, derivado del mes.',
-    VENTA.TRIMESTRE AS QUARTER(SALE_MONTH)
-      WITH SYNONYMS ('trimestre', 'quarter')
-      COMMENT = 'Trimestre del anio de la venta (1 a 4), derivado del mes.'
+    SALE.MONTH AS SALE_MONTH
+      WITH SYNONYMS ('month', 'sales month', 'period')
+      COMMENT = 'First day of the sales month. History from 2023-01 to 2025-12.',
+    SALE.YEAR AS YEAR(SALE_MONTH)
+      WITH SYNONYMS ('year')
+      COMMENT = 'Year of the sale, derived from the month.',
+    SALE.QUARTER AS QUARTER(SALE_MONTH)
+      WITH SYNONYMS ('quarter')
+      COMMENT = 'Quarter of the year of the sale (1 to 4), derived from the month.'
   )
 
   METRICS (
-    VENTA.UNIDADES_VENDIDAS AS SUM(VENTA.UNIDADES)
-      WITH SYNONYMS ('unidades', 'unidades vendidas', 'volumen')
-      COMMENT = 'Total de unidades vendidas.',
-    VENTA.VENTAS_BRUTAS AS SUM(VENTA.IMPORTE_BRUTO)
-      WITH SYNONYMS ('ventas brutas', 'facturacion bruta', 'ingresos brutos')
-      COMMENT = 'Total de ventas brutas en euros, antes de descuento.',
-    VENTA.DESCUENTO AS SUM(VENTA.IMPORTE_DESCUENTO)
-      WITH SYNONYMS ('descuento', 'descuentos', 'importe descontado')
-      COMMENT = 'Total del descuento concedido en euros.',
-    VENTA.VENTAS_NETAS AS SUM(VENTA.IMPORTE_NETO)
-      WITH SYNONYMS ('ventas', 'ventas netas', 'ingresos', 'facturacion', 'facturacion neta')
-      COMMENT = 'Total de ventas netas en euros (brutas menos descuento). Metrica de negocio por defecto para "ventas" sin cualificar.',
-    VENTA.VENTAS_NETAS_MEDIA AS AVG(VENTA.IMPORTE_NETO)
-      WITH SYNONYMS ('media de ventas netas', 'promedio de ventas netas', 'venta neta media')
-      COMMENT = 'Media de ventas netas por fila dentro del grupo consultado.',
-    TASA_DESCUENTO_MEDIA AS DIV0(VENTA.DESCUENTO, VENTA.VENTAS_BRUTAS)
-      WITH SYNONYMS ('tasa de descuento', 'porcentaje de descuento', 'descuento medio')
-      COMMENT = 'Descuento como proporcion de las ventas brutas (0 a 0.40), calculado como descuento total entre ventas brutas totales del grupo consultado.'
+    SALE.UNITS_SOLD AS SUM(SALE.UNITS)
+      WITH SYNONYMS ('units', 'units sold', 'volume')
+      COMMENT = 'Total units sold.',
+    SALE.GROSS_SALES AS SUM(SALE.GROSS_AMOUNT)
+      WITH SYNONYMS ('gross sales', 'gross revenue')
+      COMMENT = 'Total gross sales in euros, before discount.',
+    SALE.DISCOUNT AS SUM(SALE.DISCOUNT_AMOUNT)
+      WITH SYNONYMS ('discount', 'discounts', 'discount amount')
+      COMMENT = 'Total discount granted, in euros.',
+    SALE.NET_SALES AS SUM(SALE.NET_AMOUNT)
+      WITH SYNONYMS ('sales', 'net sales', 'revenue', 'turnover')
+      COMMENT = 'Total net sales in euros (gross minus discount). Default business metric for unqualified "sales".',
+    SALE.AVG_NET_SALES AS AVG(SALE.NET_AMOUNT)
+      WITH SYNONYMS ('average net sales', 'average sales')
+      COMMENT = 'Average net sales per row within the queried group.',
+    AVG_DISCOUNT_RATE AS DIV0(SALE.DISCOUNT, SALE.GROSS_SALES)
+      WITH SYNONYMS ('discount rate', 'average discount rate', 'discount percentage')
+      COMMENT = 'Discount as a proportion of gross sales (0 to 0.40), computed as total discount divided by total gross sales for the queried group.'
   )
 
-  COMMENT = 'Modelo semantico de ventas farma (datos ficticios) para responder preguntas de negocio con Cortex Analyst: unidades, ventas brutas, descuento y ventas netas por producto, marca, area terapeutica, unidad de negocio, pais, region, canal y tiempo.'
+  COMMENT = 'Semantic model of pharma sales (fictitious data) to answer business questions with Cortex Analyst: units, gross sales, discount and net sales by product, brand, therapeutic area, business unit, country, region, channel and time.'
 
   AI_VERIFIED_QUERIES (
-    q01_ventas_netas_totales_2025 AS (
-      QUESTION 'Cuales fueron las ventas netas totales en 2025?'
+    q01_total_net_sales_2025 AS (
+      QUESTION 'What were the total net sales in 2025?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION TRUE
-      SQL 'SELECT SUM(GROSS_SALES_EUR - DISCOUNT_EUR) AS VENTAS_NETAS
+      SQL 'SELECT SUM(GROSS_SALES_EUR - DISCOUNT_EUR) AS NET_SALES
            FROM CICD_DEMO.DATA.FACT_SALES
            WHERE YEAR(SALE_MONTH) = 2025'
     ),
-    q02_unidades_respiralia_alemania_2024 AS (
-      QUESTION 'Cuantas unidades vendimos de Respiralia en Alemania en 2024?'
+    q02_units_respiralia_germany_2024 AS (
+      QUESTION 'How many units of Respiralia did we sell in Germany in 2024?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT SUM(f.UNITS_SOLD) AS UNIDADES
+      SQL 'SELECT SUM(f.UNITS_SOLD) AS UNITS
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
            WHERE p.BRAND = ''Respiralia'' AND f.COUNTRY_CODE = ''DE'' AND YEAR(f.SALE_MONTH) = 2024'
     ),
-    q03_top5_marcas_ventas_netas_europa AS (
-      QUESTION 'Cual es el top 5 de marcas por ventas netas en Europa?'
+    q03_top5_brands_net_sales_europe AS (
+      QUESTION 'What are the top 5 brands by net sales in Europe?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION TRUE
-      SQL 'SELECT p.BRAND, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS VENTAS_NETAS
+      SQL 'SELECT p.BRAND, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
            JOIN CICD_DEMO.DATA.DIM_COUNTRY c ON f.COUNTRY_CODE = c.COUNTRY_CODE
            WHERE c.REGION = ''Europe''
            GROUP BY p.BRAND
-           ORDER BY VENTAS_NETAS DESC
+           ORDER BY NET_SALES DESC
            LIMIT 5'
     ),
-    q04_comparativa_unidad_negocio_2025 AS (
-      QUESTION 'Compara las ventas netas de Human Pharma y Animal Health en 2025.'
+    q04_business_unit_comparison_2025 AS (
+      QUESTION 'Compare net sales of Human Pharma and Animal Health in 2025.'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT p.BUSINESS_UNIT, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS VENTAS_NETAS
+      SQL 'SELECT p.BUSINESS_UNIT, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
            WHERE YEAR(f.SALE_MONTH) = 2025
            GROUP BY p.BUSINESS_UNIT'
     ),
-    q05_area_terapeutica_mayor_crecimiento AS (
-      QUESTION 'Que area terapeutica crecio mas en ventas netas de 2024 a 2025?'
+    q05_therapeutic_area_highest_growth AS (
+      QUESTION 'Which therapeutic area grew the most in net sales from 2024 to 2025?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'WITH POR_ANIO AS (
-             SELECT p.THERAPEUTIC_AREA, YEAR(f.SALE_MONTH) AS ANIO,
-                    SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS VENTAS_NETAS
+      SQL 'WITH BY_YEAR AS (
+             SELECT p.THERAPEUTIC_AREA, YEAR(f.SALE_MONTH) AS YR,
+                    SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
              FROM CICD_DEMO.DATA.FACT_SALES f
              JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
              WHERE YEAR(f.SALE_MONTH) IN (2024, 2025)
              GROUP BY p.THERAPEUTIC_AREA, YEAR(f.SALE_MONTH)
            )
            SELECT THERAPEUTIC_AREA,
-                  SUM(CASE WHEN ANIO = 2025 THEN VENTAS_NETAS ELSE -VENTAS_NETAS END) AS VARIACION
-           FROM POR_ANIO
+                  SUM(CASE WHEN YR = 2025 THEN NET_SALES ELSE -NET_SALES END) AS GROWTH
+           FROM BY_YEAR
            GROUP BY THERAPEUTIC_AREA
-           ORDER BY VARIACION DESC
+           ORDER BY GROWTH DESC
            LIMIT 1'
     ),
-    q06_evolucion_mensual_cardiovex_espana_2025 AS (
-      QUESTION 'Evolucion mensual de las unidades de Cardiovex en Espana durante 2025.'
+    q06_monthly_evolution_cardiovex_spain_2025 AS (
+      QUESTION 'Monthly evolution of Cardiovex units in Spain during 2025.'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT f.SALE_MONTH, SUM(f.UNITS_SOLD) AS UNIDADES
+      SQL 'SELECT f.SALE_MONTH, SUM(f.UNITS_SOLD) AS UNITS
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
            WHERE p.BRAND = ''Cardiovex'' AND f.COUNTRY_CODE = ''ES'' AND YEAR(f.SALE_MONTH) = 2025
            GROUP BY f.SALE_MONTH
            ORDER BY f.SALE_MONTH'
     ),
-    q07_canal_mayor_tasa_descuento AS (
-      QUESTION 'En que canal es mayor el descuento medio como porcentaje de las ventas brutas?'
+    q07_channel_highest_discount_rate AS (
+      QUESTION 'In which channel is the average discount, as a percentage of gross sales, highest?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT CHANNEL, SUM(DISCOUNT_EUR) / SUM(GROSS_SALES_EUR) AS TASA_DESCUENTO
+      SQL 'SELECT CHANNEL, SUM(DISCOUNT_EUR) / SUM(GROSS_SALES_EUR) AS DISCOUNT_RATE
            FROM CICD_DEMO.DATA.FACT_SALES
            GROUP BY CHANNEL
-           ORDER BY TASA_DESCUENTO DESC
+           ORDER BY DISCOUNT_RATE DESC
            LIMIT 1'
     ),
-    q08_ventas_netas_region_q4_2025 AS (
-      QUESTION 'Ventas netas por region en el cuarto trimestre de 2025.'
+    q08_net_sales_by_region_q4_2025 AS (
+      QUESTION 'Net sales by region in the fourth quarter of 2025.'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT c.REGION, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS VENTAS_NETAS
+      SQL 'SELECT c.REGION, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_COUNTRY c ON f.COUNTRY_CODE = c.COUNTRY_CODE
            WHERE f.SALE_MONTH BETWEEN DATE ''2025-10-01'' AND DATE ''2025-12-01''
            GROUP BY c.REGION'
     ),
-    q09_pais_mas_unidades_animal_health AS (
-      QUESTION 'Cual es el pais con mas unidades vendidas de productos de Animal Health?'
+    q09_country_most_units_animal_health AS (
+      QUESTION 'Which country has the most units sold of Animal Health products?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT f.COUNTRY_CODE, SUM(f.UNITS_SOLD) AS UNIDADES
+      SQL 'SELECT f.COUNTRY_CODE, SUM(f.UNITS_SOLD) AS UNITS
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
            WHERE p.BUSINESS_UNIT = ''Animal Health''
            GROUP BY f.COUNTRY_CODE
-           ORDER BY UNIDADES DESC
+           ORDER BY UNITS DESC
            LIMIT 1'
     ),
-    q10_ventas_netas_hospital_oncology_2023 AS (
-      QUESTION 'Cuantas ventas netas genero el canal hospitalario en Oncology en 2023?'
+    q10_net_sales_hospital_oncology_2023 AS (
+      QUESTION 'How much net sales did the hospital channel generate in Oncology in 2023?'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS VENTAS_NETAS
+      SQL 'SELECT SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
            FROM CICD_DEMO.DATA.FACT_SALES f
            JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
            WHERE f.CHANNEL = ''Hospital'' AND p.THERAPEUTIC_AREA = ''Oncology'' AND YEAR(f.SALE_MONTH) = 2023'
     ),
-    q11_media_mensual_ventas_netas_producto_latam AS (
-      QUESTION 'Media mensual de ventas netas por producto en LATAM.'
+    q11_avg_monthly_net_sales_per_product_latam AS (
+      QUESTION 'Average monthly net sales per product in LATAM.'
       VERIFIED_AT 1788220800
       ONBOARDING_QUESTION FALSE
-      SQL 'WITH VENTAS_MES AS (
-             SELECT p.BRAND, f.SALE_MONTH, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS VENTAS_NETAS_MES
+      SQL 'WITH MONTHLY_SALES AS (
+             SELECT p.BRAND, f.SALE_MONTH, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES_MONTH
              FROM CICD_DEMO.DATA.FACT_SALES f
              JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
              JOIN CICD_DEMO.DATA.DIM_COUNTRY c ON f.COUNTRY_CODE = c.COUNTRY_CODE
              WHERE c.REGION = ''LATAM''
              GROUP BY p.BRAND, f.SALE_MONTH
            )
-           SELECT BRAND, AVG(VENTAS_NETAS_MES) AS MEDIA_MENSUAL
-           FROM VENTAS_MES
+           SELECT BRAND, AVG(NET_SALES_MONTH) AS AVG_MONTHLY_NET_SALES
+           FROM MONTHLY_SALES
            GROUP BY BRAND'
     )
   );
@@ -250,3 +254,8 @@ CREATE OR ALTER SEMANTIC VIEW SV_VENTAS_FARMA
   claves foráneas ya declaradas en `002_tables.sql`.
 - `VERIFIED_AT 1788220800` corresponde a 2026-09-01T00:00:00Z (fecha de esta fase). Se
   actualizará solo si se reverifica alguna consulta más adelante.
+- Las preguntas (`QUESTION`) están en inglés porque el agente y quien lo consulta operan en
+  inglés (decisión D-09); el catálogo español
+  [reference-questions.md](../../001-mock-sales-dataset/contracts/reference-questions.md) de la
+  feature 001 se mantiene sin cambios, ya que es documentación de test que no se despliega a
+  Snowflake.

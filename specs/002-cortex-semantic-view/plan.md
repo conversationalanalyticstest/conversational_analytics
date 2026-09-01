@@ -9,13 +9,14 @@
 ## Summary
 
 Exponer las tres tablas físicas de `CICD_DEMO.DATA` (`DIM_PRODUCT`, `DIM_COUNTRY`, `FACT_SALES`)
-a través de una única `SEMANTIC VIEW` (`SV_VENTAS_FARMA`), con tablas lógicas, dimensiones,
-facts y métricas nombradas en lenguaje de negocio, sinónimos bilingües, y un conjunto de
-`AI_VERIFIED_QUERIES` que cubre las 11 preguntas en rango del catálogo de referencia. El
-enfoque técnico es declarativo: un único `CREATE OR ALTER SEMANTIC VIEW` idempotente,
-desplegado con el mismo patrón (rol, warehouse, script numerado) que las tablas de la feature
-`001-mock-sales-dataset`. No se toca ninguna tabla física ni se crea infraestructura de agente:
-esta feature solo entrega y valida el artefacto semántico.
+a través de una única `SEMANTIC VIEW` (`SV_PHARMA_SALES`), con tablas lógicas, dimensiones,
+facts y métricas nombradas en lenguaje de negocio **en inglés** (agente y plataforma
+conversacional operan en inglés; la documentación del repositorio sigue en español), y un
+conjunto de `AI_VERIFIED_QUERIES` que cubre las 11 preguntas en rango del catálogo de
+referencia. El enfoque técnico es declarativo: un único `CREATE OR ALTER SEMANTIC VIEW`
+idempotente, desplegado con el mismo patrón (rol, warehouse, script numerado) que las tablas de
+la feature `001-mock-sales-dataset`. No se toca ninguna tabla física ni se crea infraestructura
+de agente: esta feature solo entrega y valida el artefacto semántico.
 
 ## Technical Context
 
@@ -56,7 +57,8 @@ ajenas al esquema físico (FR-002, SC-005); debe poder explicarse en menos de ci
 - **Principio I (Simplicidad)** — PASA. Una única semantic view, sin instrucciones
   `AI_SQL_GENERATION` / `AI_QUESTION_CATEGORIZATION` adicionales (se documentan como posible
   ampliación futura, no se añaden ahora porque no aportan a la demo). Nombres de tablas
-  lógicas y métricas en español, explicables sin jerga técnica.
+  lógicas y métricas en inglés (idioma del agente y de los datos), explicables sin jerga
+  técnica.
 - **Principio II (Evaluación del agente como test)** — PASA. Los `AI_VERIFIED_QUERIES` se
   derivan 1:1 del catálogo `reference-questions.md` ya versionado; los tests que validan el
   artefacto se escriben en esta misma feature, antes de considerarla completa.
@@ -95,7 +97,7 @@ snowflake/
 ├── 001_bootstrap.sql        # (existente) rol y warehouse
 ├── 002_tables.sql           # (existente) DIM_PRODUCT, DIM_COUNTRY, FACT_SALES
 ├── 003_seed.sql             # (existente) carga determinista
-└── 004_semantic_view.sql    # NUEVO: CREATE OR ALTER SEMANTIC VIEW SV_VENTAS_FARMA
+└── 004_semantic_view.sql    # NUEVO: CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
 
 tests/
 ├── conftest.py                        # (existente) fixture de conexión
