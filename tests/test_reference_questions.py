@@ -43,7 +43,7 @@ def test_q02_units_of_a_brand_in_a_country_and_year(scalar: Callable[[str], Any]
         SELECT SUM(f.UNITS_SOLD)
         {FACT_WITH_DIMS}
         WHERE p.BRAND = 'Respiralia'
-          AND c.COUNTRY_NAME = 'Alemania'
+          AND c.COUNTRY_NAME = 'Germany'
           AND YEAR(f.SALE_MONTH) = 2024
         """
     )
@@ -123,7 +123,7 @@ def test_q06_monthly_series_of_a_brand_in_a_country(
         SELECT f.SALE_MONTH, SUM(f.UNITS_SOLD) AS UNITS
         {FACT_WITH_DIMS}
         WHERE p.BRAND = 'Cardiovex'
-          AND c.COUNTRY_NAME = 'Espana'
+          AND c.COUNTRY_NAME = 'Spain'
           AND YEAR(f.SALE_MONTH) = 2025
         GROUP BY f.SALE_MONTH
         ORDER BY f.SALE_MONTH
