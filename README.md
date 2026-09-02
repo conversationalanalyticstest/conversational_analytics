@@ -60,6 +60,33 @@ poetry python install 3.14   # experimental, descarga un Python standalone
 
 En CI se fija con `actions/setup-python`.
 
+## Agente conversacional
+
+Traduce preguntas en lenguaje natural a SQL sobre `SV_PHARMA_SALES` con **Cortex Analyst**
+(obligatorio, Principio del proyecto) y orquesta la conversación con el **SDK de OpenAI**,
+apuntando a la API pública de OpenAI o al endpoint de Cortex según `LLM_PROVIDER`. Detalle de
+diseño en [specs/003-conversational-agent](specs/003-conversational-agent/plan.md).
+
+```bash
+poetry run python -m conversational_analytics.cli "¿Cuáles fueron las ventas netas totales en 2025?"
+poetry run python -m conversational_analytics.cli --verbose "¿Qué producto vendió más en Francia?"
+poetry run python -m conversational_analytics.cli --check   # comprueba proveedor y conectividad
+```
+
+Variables relevantes en `.env` (ver `.env.example`):
+
+| Variable | Obligatoria si | Qué hace |
+|---|---|---|
+| `LLM_PROVIDER` | — | `openai` (por defecto) o `cortex`; decide qué credencial y `base_url` usa el SDK |
+| `OPENAI_API_KEY` | `LLM_PROVIDER=openai` | Clave de la API pública de OpenAI |
+| `OPENAI_MODEL` / `CORTEX_MODEL` | — | Modelo a usar; hay valores por defecto razonables |
+| `SNOWFLAKE_SEMANTIC_VIEW` | — | Semantic view a consultar (`CICD_DEMO.DATA.SV_PHARMA_SALES` por defecto) |
+
+Cada invocación queda registrada en `CICD_DEMO.DEVOPS.AGENT_TELEMETRY` (pregunta, SQL generado,
+proveedor/modelo, tokens, coste estimado, latencia y estado) — ver
+[snowflake/005_telemetry.sql](snowflake/005_telemetry.sql) y
+[snowflake/README.md](snowflake/README.md).
+
 ## Estructura
 
 ```

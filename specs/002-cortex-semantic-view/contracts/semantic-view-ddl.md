@@ -117,58 +117,67 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
   AI_VERIFIED_QUERIES (
     q01_total_net_sales_2025 AS (
       QUESTION 'What were the total net sales in 2025?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION TRUE
-      SQL 'SELECT SUM(GROSS_SALES_EUR - DISCOUNT_EUR) AS NET_SALES
-           FROM CICD_DEMO.DATA.FACT_SALES
-           WHERE YEAR(SALE_MONTH) = 2025'
+      SQL 'SELECT NET_SALES
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             METRICS SALE.NET_SALES
+             WHERE SALE.YEAR = 2025
+           )'
     ),
     q02_units_respiralia_germany_2024 AS (
       QUESTION 'How many units of Respiralia did we sell in Germany in 2024?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT SUM(f.UNITS_SOLD) AS UNITS
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-           WHERE p.BRAND = ''Respiralia'' AND f.COUNTRY_CODE = ''DE'' AND YEAR(f.SALE_MONTH) = 2024'
+      SQL 'SELECT UNITS_SOLD AS UNITS
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             METRICS SALE.UNITS_SOLD
+             WHERE PRODUCT.BRAND = ''Respiralia'' AND COUNTRY.COUNTRY_NAME = ''Germany'' AND SALE.YEAR = 2024
+           )'
     ),
     q03_top5_brands_net_sales_europe AS (
       QUESTION 'What are the top 5 brands by net sales in Europe?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION TRUE
-      SQL 'SELECT p.BRAND, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-           JOIN CICD_DEMO.DATA.DIM_COUNTRY c ON f.COUNTRY_CODE = c.COUNTRY_CODE
-           WHERE c.REGION = ''Europe''
-           GROUP BY p.BRAND
+      SQL 'SELECT BRAND, NET_SALES
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             DIMENSIONS PRODUCT.BRAND
+             METRICS SALE.NET_SALES
+             WHERE COUNTRY.REGION = ''Europe''
+           )
            ORDER BY NET_SALES DESC
            LIMIT 5'
     ),
     q04_business_unit_comparison_2025 AS (
       QUESTION 'Compare net sales of Human Pharma and Animal Health in 2025.'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT p.BUSINESS_UNIT, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-           WHERE YEAR(f.SALE_MONTH) = 2025
-           GROUP BY p.BUSINESS_UNIT'
+      SQL 'SELECT BUSINESS_UNIT, NET_SALES
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             DIMENSIONS PRODUCT.BUSINESS_UNIT
+             METRICS SALE.NET_SALES
+             WHERE SALE.YEAR = 2025
+           )'
     ),
     q05_therapeutic_area_highest_growth AS (
       QUESTION 'Which therapeutic area grew the most in net sales from 2024 to 2025?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
       SQL 'WITH BY_YEAR AS (
-             SELECT p.THERAPEUTIC_AREA, YEAR(f.SALE_MONTH) AS YR,
-                    SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
-             FROM CICD_DEMO.DATA.FACT_SALES f
-             JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-             WHERE YEAR(f.SALE_MONTH) IN (2024, 2025)
-             GROUP BY p.THERAPEUTIC_AREA, YEAR(f.SALE_MONTH)
+             SELECT THERAPEUTIC_AREA, YEAR, NET_SALES
+             FROM SEMANTIC_VIEW(
+               CICD_DEMO.DATA.SV_PHARMA_SALES
+               DIMENSIONS PRODUCT.THERAPEUTIC_AREA, SALE.YEAR
+               METRICS SALE.NET_SALES
+               WHERE SALE.YEAR IN (2024, 2025)
+             )
            )
            SELECT THERAPEUTIC_AREA,
-                  SUM(CASE WHEN YR = 2025 THEN NET_SALES ELSE -NET_SALES END) AS GROWTH
+                  SUM(CASE WHEN YEAR = 2025 THEN NET_SALES ELSE -NET_SALES END) AS GROWTH
            FROM BY_YEAR
            GROUP BY THERAPEUTIC_AREA
            ORDER BY GROWTH DESC
@@ -176,69 +185,81 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
     ),
     q06_monthly_evolution_cardiovex_spain_2025 AS (
       QUESTION 'Monthly evolution of Cardiovex units in Spain during 2025.'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT f.SALE_MONTH, SUM(f.UNITS_SOLD) AS UNITS
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-           WHERE p.BRAND = ''Cardiovex'' AND f.COUNTRY_CODE = ''ES'' AND YEAR(f.SALE_MONTH) = 2025
-           GROUP BY f.SALE_MONTH
-           ORDER BY f.SALE_MONTH'
+      SQL 'SELECT MONTH, UNITS_SOLD AS UNITS
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             DIMENSIONS SALE.MONTH
+             METRICS SALE.UNITS_SOLD
+             WHERE PRODUCT.BRAND = ''Cardiovex'' AND COUNTRY.COUNTRY_NAME = ''Spain'' AND SALE.YEAR = 2025
+           )
+           ORDER BY MONTH'
     ),
     q07_channel_highest_discount_rate AS (
       QUESTION 'In which channel is the average discount, as a percentage of gross sales, highest?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT CHANNEL, SUM(DISCOUNT_EUR) / SUM(GROSS_SALES_EUR) AS DISCOUNT_RATE
-           FROM CICD_DEMO.DATA.FACT_SALES
-           GROUP BY CHANNEL
+      SQL 'SELECT CHANNEL, AVG_DISCOUNT_RATE AS DISCOUNT_RATE
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             DIMENSIONS SALE.CHANNEL
+             METRICS AVG_DISCOUNT_RATE
+           )
            ORDER BY DISCOUNT_RATE DESC
            LIMIT 1'
     ),
     q08_net_sales_by_region_q4_2025 AS (
       QUESTION 'Net sales by region in the fourth quarter of 2025.'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT c.REGION, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_COUNTRY c ON f.COUNTRY_CODE = c.COUNTRY_CODE
-           WHERE f.SALE_MONTH BETWEEN DATE ''2025-10-01'' AND DATE ''2025-12-01''
-           GROUP BY c.REGION'
+      SQL 'SELECT REGION, NET_SALES
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             DIMENSIONS COUNTRY.REGION
+             METRICS SALE.NET_SALES
+             WHERE SALE.YEAR = 2025 AND SALE.QUARTER = 4
+           )'
     ),
     q09_country_most_units_animal_health AS (
       QUESTION 'Which country has the most units sold of Animal Health products?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT f.COUNTRY_CODE, SUM(f.UNITS_SOLD) AS UNITS
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-           WHERE p.BUSINESS_UNIT = ''Animal Health''
-           GROUP BY f.COUNTRY_CODE
+      SQL 'SELECT COUNTRY_NAME, UNITS_SOLD AS UNITS
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             DIMENSIONS COUNTRY.COUNTRY_NAME
+             METRICS SALE.UNITS_SOLD
+             WHERE PRODUCT.BUSINESS_UNIT = ''Animal Health''
+           )
            ORDER BY UNITS DESC
            LIMIT 1'
     ),
     q10_net_sales_hospital_oncology_2023 AS (
       QUESTION 'How much net sales did the hospital channel generate in Oncology in 2023?'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
-      SQL 'SELECT SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES
-           FROM CICD_DEMO.DATA.FACT_SALES f
-           JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-           WHERE f.CHANNEL = ''Hospital'' AND p.THERAPEUTIC_AREA = ''Oncology'' AND YEAR(f.SALE_MONTH) = 2023'
+      SQL 'SELECT NET_SALES
+           FROM SEMANTIC_VIEW(
+             CICD_DEMO.DATA.SV_PHARMA_SALES
+             METRICS SALE.NET_SALES
+             WHERE SALE.CHANNEL = ''Hospital'' AND PRODUCT.THERAPEUTIC_AREA = ''Oncology'' AND SALE.YEAR = 2023
+           )'
     ),
     q11_avg_monthly_net_sales_per_product_latam AS (
       QUESTION 'Average monthly net sales per product in LATAM.'
-      VERIFIED_AT 1788220800
+      VERIFIED_AT 1788307200
       ONBOARDING_QUESTION FALSE
       SQL 'WITH MONTHLY_SALES AS (
-             SELECT p.BRAND, f.SALE_MONTH, SUM(f.GROSS_SALES_EUR - f.DISCOUNT_EUR) AS NET_SALES_MONTH
-             FROM CICD_DEMO.DATA.FACT_SALES f
-             JOIN CICD_DEMO.DATA.DIM_PRODUCT p ON f.PRODUCT_ID = p.PRODUCT_ID
-             JOIN CICD_DEMO.DATA.DIM_COUNTRY c ON f.COUNTRY_CODE = c.COUNTRY_CODE
-             WHERE c.REGION = ''LATAM''
-             GROUP BY p.BRAND, f.SALE_MONTH
+             SELECT BRAND, MONTH, NET_SALES
+             FROM SEMANTIC_VIEW(
+               CICD_DEMO.DATA.SV_PHARMA_SALES
+               DIMENSIONS PRODUCT.BRAND, SALE.MONTH
+               METRICS SALE.NET_SALES
+               WHERE COUNTRY.REGION = ''LATAM''
+             )
            )
-           SELECT BRAND, AVG(NET_SALES_MONTH) AS AVG_MONTHLY_NET_SALES
+           SELECT BRAND, AVG(NET_SALES) AS AVG_MONTHLY_NET_SALES
            FROM MONTHLY_SALES
            GROUP BY BRAND'
     )
@@ -259,3 +280,10 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
   [reference-questions.md](../../001-mock-sales-dataset/contracts/reference-questions.md) de la
   feature 001 se mantiene sin cambios, ya que es documentación de test que no se despliega a
   Snowflake.
+- `VERIFIED_AT 1788307200` (2026-09-02T00:00:00Z): el `SQL` de las 11 verified queries se
+  reescribió para usar `SEMANTIC_VIEW(CICD_DEMO.DATA.SV_PHARMA_SALES ...)` con el nombre
+  completamente cualificado (ver D-11 en [research.md](../research.md)), corrigiendo el
+  defecto D-06 documentado en `specs/003-conversational-agent/research.md`: con SQL directo
+  sobre tablas físicas, o con el nombre de la semantic view sin cualificar, Cortex Analyst
+  nunca marcaba `confidence.verified_query_used`. Verificado empíricamente contra la cuenta
+  real (Q01 y Q05).

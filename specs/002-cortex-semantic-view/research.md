@@ -157,6 +157,44 @@ si esa sintaxis se resuelve como una vista implícita sobre el modelo semántico
 del ejemplo; escribir SQL directo contra las tablas físicas elimina esa ambigüedad y es
 verificable con el mismo mecanismo de test que ya usa el proyecto.
 
+> **Superseded por D-11 (2026-09-02)**: la decisión de escribir el `SQL` contra tablas físicas
+> resultó ser el defecto D-06 documentado en `specs/003-conversational-agent/research.md`:
+> Cortex Analyst detecta las tablas físicas, las reescribe silenciosamente a nombres lógicos y
+> nunca marca `confidence.verified_query_used`. Ver D-11 para la corrección aplicada.
+
+## D-11: Corrección de `AI_VERIFIED_QUERIES` — usar `SEMANTIC_VIEW(...)` con nombre completamente cualificado
+
+**Decision** (2026-09-02, corrige D-08): las 11 `AI_VERIFIED_QUERIES` se reescriben para usar
+`SELECT ... FROM SEMANTIC_VIEW(CICD_DEMO.DATA.SV_PHARMA_SALES ...)` (nombres lógicos del modelo
+semántico, vía la función de tabla documentada), en vez de SQL directo contra
+`CICD_DEMO.DATA.FACT_SALES`/`DIM_PRODUCT`/`DIM_COUNTRY`. `VERIFIED_AT` se actualiza a
+`1788307200` (2026-09-02T00:00:00Z) en las 11 entradas.
+
+**Rationale**: la documentación oficial de Snowflake (`CREATE SEMANTIC VIEW`,
+`SEMANTIC_VIEW()`) confirma que `SEMANTIC_VIEW(...)` es la sintaxis correcta y no ambigua para
+`AI_VERIFIED_QUERIES` — el propio ejemplo oficial de TPC-H usa nombres lógicos. Verificado
+empíricamente en dos capas:
+1. Al desplegar con SQL sin cualificar (`SEMANTIC_VIEW(SV_PHARMA_SALES ...)`), Cortex Analyst
+   emite un warning en cada llamada: las 11 verified queries "had compilation error: Unable to
+   run the SELECT command. You must specify the database... or set DEFAULT_NAMESPACE" y quedan
+   ignoradas (`verified_query_used` sigue `None`). Causa: Cortex Analyst compila el `SQL` de
+   cada verified query en un contexto sin base de datos/esquema por defecto (a diferencia de
+   una sesión interactiva con `USE SCHEMA` ya ejecutado).
+2. Al cualificar completamente (`SEMANTIC_VIEW(CICD_DEMO.DATA.SV_PHARMA_SALES ...)`), el
+   warning desaparece y `confidence.verified_query_used.name` se rellena correctamente
+   (probado con Q01 y Q05 — Q05 es la pregunta de "qué área terapéutica creció más", la misma
+   que aparecía como limitación conocida y no determinista en `specs/003-conversational-agent/research.md`).
+   El SQL generado por Cortex Analyst para estas preguntas ahora es literalmente el de la
+   verified query (nombres en minúscula, reformateado, pero equivalente).
+
+**Alternatives considered**: Mantener el SQL físico y aceptar `verified_query_used = None`
+siempre (statu quo) — descartada porque el propio FR-008 de esta feature exige verified
+queries operativas, no solo declaradas. Usar `SELECT sale.net_sales FROM sale` (forma "vista
+implícita" sin la función `SEMANTIC_VIEW()`, la alternativa que D-08 ya había descartado por
+ambigüedad) — no reintentada: `SEMANTIC_VIEW(...)` es la forma que la documentación describe
+sin ambigüedad y que además ya usa `tests/test_semantic_view.py` (que sirvió de base para las
+11 reescrituras), evitando introducir una tercera sintaxis distinta en el proyecto.
+
 ## D-09: Idioma de los identificadores frente al idioma de la documentación
 
 **Decision** (2026-09-01, refinamiento posterior a la primera versión de esta fase): los
@@ -217,7 +255,8 @@ corregirlo en el origen (Principio I).
 | D-05 | `IS_ENUM` + `SAMPLE_VALUES` en dominios cerrados | FR-009 |
 | D-06 | Métrica derivada para tasa de descuento | Q-07 (User Story 3) |
 | D-07 | Dimensiones derivadas de año y trimestre | Q-01, Q-04, Q-08, Q-10 |
-| D-08 | `AI_VERIFIED_QUERIES` con pregunta en inglés y SQL directo sobre tablas físicas | FR-008 |
+| D-08 | `AI_VERIFIED_QUERIES` con pregunta en inglés y SQL directo sobre tablas físicas (superseded por D-11) | FR-008 |
 | D-09 | Identificadores/sinónimos/preguntas en inglés; documentación del repo en español | Aclaración del usuario, 2026-09-01 |
 | D-10 | `COUNTRY_NAME` traducido a inglés en el seed (feature 001) + `IS_ENUM` | Hallazgo en `003_seed.sql`, elimina riesgo de FR-012/SC-001 |
+| D-11 | `AI_VERIFIED_QUERIES` reescritas con `SEMANTIC_VIEW(CICD_DEMO.DATA.SV_PHARMA_SALES ...)` cualificado | FR-008, corrige el defecto D-06 de la feature 003 |
 
