@@ -1,22 +1,31 @@
 <!--
 SYNC IMPACT REPORT
-Version change: TEMPLATE (sin versionar) → 1.0.0
-Bump rationale: MAJOR inicial. Primera ratificación: se sustituyen todos los
-placeholders del scaffold por principios concretos del proyecto.
+Version change: 1.0.0 → 2.0.0
+Bump rationale: MAJOR. Se revierte una prohibición explícita: la v1.0.0 declaraba
+"NO se usa la API pública de OpenAI". La v2.0.0 la permite para la capa de
+orquestación. Es una redefinición incompatible hacia atrás de una restricción
+tecnológica vinculante, no una aclaración.
 
-Principios definidos (nuevos, no había versión previa):
-  - I. Simplicidad Orientada a la Demo (NON-NEGOTIABLE)
-  - II. Evaluación del Agente como Test (NON-NEGOTIABLE)
-  - III. CI/CD Es el Producto
-  - IV. Observabilidad y Control de Coste
-  - V. Reproducibilidad y Gestión de Secretos
+Causa: verificación empírica contra la cuenta Snowflake del proyecto (2026-09-02).
+La cuenta es de tipo trial y NO tiene habilitada la inferencia LLM de Cortex por
+ninguna vía: `SNOWFLAKE.CORTEX.COMPLETE` falla con 399258 ("not available for
+trial accounts") y los endpoints REST `/api/v2/cortex/inference:complete` y
+`/api/v2/cortex/v1/chat/completions` devuelven 403 003001. La restricción de la
+v1.0.0 era, por tanto, imposible de cumplir. Cortex Analyst
+(`/api/v2/cortex/analyst/message`) sí funciona y se conserva como pieza obligatoria.
 
-Secciones añadidas:
-  - Restricciones Tecnológicas (era [SECTION_2_NAME])
-  - Flujo de Desarrollo (era [SECTION_3_NAME])
-  - Governance (rellenada)
+Principios modificados:
+  - IV. Observabilidad y Control de Coste — ampliado: el registro MUST incluir
+    proveedor y modelo, y el coste MUST indicar su unidad (créditos o USD).
 
-Secciones eliminadas: ninguna.
+Principios sin cambios: I, II, III, V.
+
+Secciones modificadas:
+  - Restricciones Tecnológicas — la viñeta "Modelo" se reescribe separando
+    traducción NL→SQL (Cortex Analyst, obligatorio) de orquestación (SDK de
+    OpenAI, proveedor configurable). Se añade la viñeta "Salida de datos".
+
+Secciones añadidas: ninguna. Secciones eliminadas: ninguna.
 
 Follow-up TODOs: ninguno. Todos los placeholders resueltos.
 -->
@@ -84,8 +93,10 @@ ejecutado no es un rollback.
 Cada invocación del agente MUST quedar registrada de forma persistente y consultable.
 
 - Registro mínimo por invocación: timestamp, origen, pregunta, SQL generado, respuesta, tokens
-  de entrada y salida, coste estimado, latencia, estado (éxito/error) y versión del agente
-  (commit SHA).
+  de entrada y salida, coste estimado, latencia, estado (éxito/error), versión del agente
+  (commit SHA), y proveedor y modelo usados para la orquestación.
+- El coste MUST registrarse indicando su unidad y proveedor (créditos de Snowflake o USD de
+  OpenAI), de forma que sea comparable entre despliegues aunque se cambie de proveedor.
 - La telemetría MUST almacenarse en Snowflake, para poder consultarse con SQL como cualquier
   otra tabla del proyecto.
 - MUST existir una vista o panel que responda a: qué se ha preguntado, cuánto ha costado y si
@@ -117,9 +128,20 @@ demo que solo funciona en un portátil concreto no se puede enseñar.
   dependencias.
 - **Datos**: Snowflake. Las tablas de negocio se exponen al agente mediante **semantic views**
   versionadas en el repositorio.
-- **Modelo**: Snowflake Cortex, accedido a través del **SDK de OpenAI apuntando al endpoint de
-  Cortex**. Esta distinción es obligatoria: NO se usa la API pública de OpenAI; el consumo
-  ocurre dentro de Snowflake.
+- **Traducción a SQL**: **Cortex Analyst** (`POST /api/v2/cortex/analyst/message`) MUST ser el
+  único componente que traduce lenguaje natural a SQL, y siempre contra una semantic view
+  versionada en el repositorio. El SQL resultante MUST ejecutarse dentro de Snowflake. Esta
+  pieza no es negociable: es la que hace que la demo trate sobre Snowflake.
+- **Orquestación**: la capa que razona y redacta la respuesta final usa el **SDK de OpenAI**.
+  Se permite apuntarlo a la **API pública de OpenAI** (`OPENAI_API_KEY`) o al endpoint de
+  Cortex, según lo que la cuenta tenga habilitado. El `base_url` y el modelo MUST ser
+  configurables por variable de entorno, de modo que cambiar de proveedor no requiera tocar
+  código ni tests.
+- **Salida de datos**: cuando el orquestador sea un proveedor externo, lo único que MUST salir
+  de Snowflake es la pregunta del usuario y las filas del resultado de la consulta, acotadas a
+  un máximo documentado. MUST NOT enviarse credenciales, tokens ni volcados de tablas
+  completas. Este proyecto usa datos ficticios; reutilizar esta arquitectura con datos reales
+  MUST revisarse antes.
 - **Agente**: el framework queda a elección, priorizando el más simple de explicar. La versión
   inicial es un agente de un solo turno sin contexto previo.
 - **CI/CD**: GitHub Actions.
@@ -167,4 +189,4 @@ repositorio.
 - Los artefactos de `specs/` (spec, plan, tasks) son la guía operativa en tiempo de ejecución y
   MUST ser coherentes con este documento.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-31 | **Last Amended**: 2026-08-31
+**Version**: 2.0.0 | **Ratified**: 2026-08-31 | **Last Amended**: 2026-09-02
