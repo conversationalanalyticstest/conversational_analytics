@@ -48,18 +48,18 @@ Proyecto único (ver "Project Structure" en [plan.md](./plan.md)):
 **Purpose**: Dejar el entorno en condiciones y **verificar empíricamente** que el proveedor por
 defecto (OpenAI público) funciona de punta a punta, antes de escribir una sola línea de agente.
 
-- [ ] T001 Añadir `openai` y `httpx` a `pyproject.toml` con `poetry add openai httpx` y regenerar
+- [X] T001 Añadir `openai` y `httpx` a `pyproject.toml` con `poetry add openai httpx` y regenerar
       `poetry.lock`. Verificar que instalan en el venv de Python 3.14 (esta máquina no tiene
       compilador C: si alguna dependencia transitiva no trae wheel, recrear el venv con
       `poetry env use 3.12`, que sigue dentro de `requires-python`). Hecho cuando
       `.venv\Scripts\python.exe -c "import openai, httpx"` no falla.
-- [ ] T002 [P] Documentar en `.env.example` las variables nuevas: `LLM_PROVIDER` (opcional,
+- [X] T002 [P] Documentar en `.env.example` las variables nuevas: `LLM_PROVIDER` (opcional,
       defecto `openai`), `OPENAI_API_KEY` (obligatoria si `LLM_PROVIDER=openai`, el caso por
       defecto), `OPENAI_MODEL` (opcional, defecto `gpt-4.1-mini`), `CORTEX_MODEL` (opcional, se
       fija tras verificar en T004) y `SNOWFLAKE_SEMANTIC_VIEW` (opcional, defecto
       `CICD_DEMO.DATA.SV_PHARMA_SALES`). Comentario explícito de que `OPENAI_API_KEY` sólo se lee
       con `LLM_PROVIDER=openai` (Restricción Tecnológica de la constitución, v2.0.0).
-- [ ] T003 Verificar el rol por defecto del usuario (D-04): ejecutar
+- [X] T003 Verificar el rol por defecto del usuario (D-04): ejecutar
       `SHOW USERS LIKE 'CONVERSATIONALANALYTICSTEST';` y comprobar que `default_role` es
       `CICD_DEMO_ROLE`. Si no lo es, añadir
       `ALTER USER CONVERSATIONALANALYTICSTEST SET DEFAULT_ROLE = CICD_DEMO_ROLE;` a
@@ -67,7 +67,7 @@ defecto (OpenAI público) funciona de punta a punta, antes de escribir una sola 
       `SNOWFLAKE.CORTEX_USER` por herencia. Bloquea Cortex Analyst (siempre necesario) y, si se
       usa `LLM_PROVIDER=cortex`, también al orquestador: sin esto la API REST devuelve `403`
       aunque el conector funcione.
-- [ ] T004 Verificar el proveedor por defecto (`LLM_PROVIDER=openai`, D-11): con una
+- [X] T004 Verificar el proveedor por defecto (`LLM_PROVIDER=openai`, D-11): con una
       `OPENAI_API_KEY` real, confirmar mediante una llamada mínima a
       `client.chat.completions.create(...)` (SDK `openai`, sin `base_url` propio) que
       `OPENAI_MODEL=gpt-4.1-mini` responde y que **devuelve `tool_calls`** al pasarle un `tools`
@@ -91,12 +91,12 @@ desde el principio.
 
 **⚠️ CRITICAL**: Ninguna tarea de las fases 3-5 puede empezar hasta completar esta fase.
 
-- [ ] T005 [P] Crear `src/conversational_analytics/prompts.py` con la constante `SYSTEM_PROMPT`:
+- [X] T005 [P] Crear `src/conversational_analytics/prompts.py` con la constante `SYSTEM_PROMPT`:
       el agente responde en español, usa **siempre** la herramienta para obtener datos, no inventa
       cifras nunca, y si la herramienta no devuelve filas lo dice explícitamente. Docstring de
       módulo indicando que es un artefacto desplegable versionado (Principio III), no una cadena
       auxiliar.
-- [ ] T006 [P] Crear `src/conversational_analytics/cortex_analyst.py`: cliente `httpx` de
+- [X] T006 [P] Crear `src/conversational_analytics/cortex_analyst.py`: cliente `httpx` de
       `/api/v2/cortex/analyst/message` según
       [contracts/cortex-endpoints.md](./contracts/cortex-endpoints.md). Función
       `generate_sql(question: str) -> AnalystResult` con las cabeceras `Authorization: Bearer` y
@@ -104,13 +104,13 @@ desde el principio.
       con `SNOWFLAKE_PAT` (sea cual sea `LLM_PROVIDER`), `timeout=60`, y el parseo de
       `message.content[]` extrayendo `statement`, `confidence.verified_query_used.name`,
       `request_id` y `warnings`. En esta fase sólo la ruta feliz; el mapa de errores es T020.
-- [ ] T007 [P] Crear `src/conversational_analytics/llm_provider.py` con `build_llm_client() ->
+- [X] T007 [P] Crear `src/conversational_analytics/llm_provider.py` con `build_llm_client() ->
       tuple[OpenAI, str, str]` (D-11): lee `LLM_PROVIDER` (defecto `openai`); si `openai`,
       construye `OpenAI(api_key=OPENAI_API_KEY)` y usa `OPENAI_MODEL` (defecto `gpt-4.1-mini`); si
       `cortex`, construye `OpenAI(api_key=SNOWFLAKE_PAT, base_url=".../api/v2/cortex/v1")` y usa
       `CORTEX_MODEL`. Es el **único** punto del código que decide el proveedor — `agent.py` sólo
       consume la tupla devuelta, según [contracts/cortex-endpoints.md](./contracts/cortex-endpoints.md).
-- [ ] T008 [P] Crear `src/conversational_analytics/telemetry.py` con el `Protocol` `Telemetry`
+- [X] T008 [P] Crear `src/conversational_analytics/telemetry.py` con el `Protocol` `Telemetry`
       (método `record(event: TelemetryEvent) -> None`), la dataclass `TelemetryEvent` con las 21
       columnas de [data-model.md](./data-model.md) (incluidas `PROVIDER` y `COST_UNIT`),
       `NullTelemetry` (no-op, para tests) y dos diccionarios de tarifas —
@@ -118,11 +118,11 @@ desde el principio.
       `estimated_cost(provider, model, prompt_tokens, completion_tokens) -> tuple[float | None,
       str]` que devuelve `(coste, unidad)`, con coste `None` si el modelo no está en la tabla
       correspondiente, sin lanzar. `SnowflakeTelemetry` **no** se implementa aquí: es T027.
-- [ ] T009 Crear `src/conversational_analytics/agent.py` con **sólo** los tipos públicos del
+- [X] T009 Crear `src/conversational_analytics/agent.py` con **sólo** los tipos públicos del
       contrato: `AgentStatus` (`OK`/`NO_DATA`/`ERROR`), `TokenUsage` (con el campo `provider`) y
       `AgentResponse` (`@dataclass(frozen=True)`), tal y como los fija
       [contracts/agent-api.md](./contracts/agent-api.md). Sin lógica todavía.
-- [ ] T010 Añadir a `tests/conftest.py` las fixtures del agente, reutilizando las existentes sin
+- [X] T010 Añadir a `tests/conftest.py` las fixtures del agente, reutilizando las existentes sin
       modificarlas: `null_telemetry` (devuelve `NullTelemetry()`) y `agent_answer`, una fixture de
       ámbito sesión que invoca `ask(question, telemetry=NullTelemetry(), source="test")` y
       **cachea la respuesta por pregunta** para no pagar dos veces la misma invocación entre
@@ -143,7 +143,7 @@ la aserción del catálogo de referencia. No requiere telemetría ni manejo de a
 
 ### Tests (ANTES de la implementación — FR-010, Principio II)
 
-- [ ] T011 [US1] Crear `tests/test_agent_evaluation.py` con los casos Q-01 a Q-11 según la matriz
+- [X] T011 [US1] Crear `tests/test_agent_evaluation.py` con los casos Q-01 a Q-11 según la matriz
       de [contracts/agent-api.md](./contracts/agent-api.md). Asserts sobre `AgentResponse.rows`
       comparados contra el valor exacto de la consulta baseline ya existente en
       `tests/test_reference_questions.py` (decision D-07 revisada, no un umbral debil ni la
@@ -153,7 +153,7 @@ la aserción del catálogo de referencia. No requiere telemetría ni manejo de a
       preguntas se toman literalmente de
       [reference-questions.md](../001-mock-sales-dataset/contracts/reference-questions.md). Hecho
       cuando los 11 tests **fallan** por `ImportError`/`AttributeError` de `ask`.
-- [ ] T012 [P] [US1] Crear `tests/test_agent_contract.py` con `test_provider_matches_config`
+- [X] T012 [P] [US1] Crear `tests/test_agent_contract.py` con `test_provider_matches_config`
       (verifica que el proveedor y modelo usados coinciden con `LLM_PROVIDER`, sin cruzar la
       credencial del otro proveedor, D-08),
       `test_ask_is_stateless` (dos `ask()` seguidos; el segundo no resuelve una referencia al
@@ -162,21 +162,21 @@ la aserción del catálogo de referencia. No requiere telemetría ni manejo de a
 
 ### Implementación
 
-- [ ] T013 [US1] En `src/conversational_analytics/agent.py`: constante
+- [X] T013 [US1] En `src/conversational_analytics/agent.py`: constante
       `QUERY_SEMANTIC_VIEW_SCHEMA` (JSON schema, en una constante aparte por la regla de diseño 2
       del plan) y función `query_semantic_view(question: str) -> dict` — función Python normal,
       **sin decoradores**. Llama a `cortex_analyst.generate_sql()`, ejecuta el `statement` con
       `db.get_connection()`, devuelve `rows` (como `list[dict]`, truncado a
       `MAX_ROWS_TO_MODEL = 100`), `sql`, `verified_query_name`, `request_id` y `sf_query_id`
       (`cursor.sfqid`).
-- [ ] T014 [US1] En `src/conversational_analytics/agent.py`: obtener `(client, provider, model)`
+- [X] T014 [US1] En `src/conversational_analytics/agent.py`: obtener `(client, provider, model)`
       de `llm_provider.build_llm_client()` (T007) e implementar
       `ask(question, *, telemetry=None, source="cli") -> AgentResponse` con el bucle de
       *tool-calling* explícito (límite de iteraciones para no ciclar), **acumulando `usage` de
       todas las llamadas al modelo**, no sólo de la última, guardando `provider`/`model` en el
       `TokenUsage` devuelto. Devuelve `status=OK` cuando hay filas. El bucle debe quedar legible:
       es lo que se enseña en la demo (SC-004).
-- [ ] T015 [US1] Crear `src/conversational_analytics/cli.py` con `argparse`: pregunta posicional,
+- [X] T015 [US1] Crear `src/conversational_analytics/cli.py` con `argparse`: pregunta posicional,
       `--verbose` (SQL generado, verified query, estado, tokens, latencia, proveedor y modelo) y
       `--check` (verifica el proveedor configurado y el endpoint de Cortex Analyst, paso 4 de
       [quickstart.md](./quickstart.md)). Códigos de
@@ -200,22 +200,22 @@ ninguna cifra inventada.
 
 ### Tests (ANTES de la implementación)
 
-- [ ] T017 [US2] Añadir el caso Q-12 a `tests/test_agent_evaluation.py`: `status == NO_DATA`,
+- [X] T017 [US2] Añadir el caso Q-12 a `tests/test_agent_evaluation.py`: `status == NO_DATA`,
       `rows` vacía (comprobación real de "sin cifra inventada", no un regex sobre `answer`), y
       `answer` expresa ausencia de datos. Debe fallar mientras `ask()` no distinga `NO_DATA`.
-- [ ] T018 [P] [US2] Añadir a `tests/test_agent_contract.py`: `test_out_of_domain_question`
+- [X] T018 [P] [US2] Añadir a `tests/test_agent_contract.py`: `test_out_of_domain_question`
       ("¿Qué tiempo hace hoy?" → `NO_DATA`, no `ERROR` ni cifra inventada) y
       `test_analyst_timeout_returns_error` (timeout forzado → `status == ERROR` con mensaje de
       fallo de servicio, FR-009).
 
 ### Implementación
 
-- [ ] T019 [US2] En `src/conversational_analytics/cortex_analyst.py`: implementar el mapa de
+- [X] T019 [US2] En `src/conversational_analytics/cortex_analyst.py`: implementar el mapa de
       errores completo de [contracts/cortex-endpoints.md](./contracts/cortex-endpoints.md) —
       `timeout`, `401`, `403`, `400`, y el bloque `content[].type == "suggestions"` como señal de
       "no se pudo generar SQL", que **no** es un error. Registrar `warnings[]` cuando no esté
       vacío. Hacer el timeout configurable para que T018 pueda forzarlo.
-- [ ] T020 [US2] En `src/conversational_analytics/agent.py`: derivar `AgentStatus` según la
+- [X] T020 [US2] En `src/conversational_analytics/agent.py`: derivar `AgentStatus` según la
       máquina de estados de [data-model.md](./data-model.md) (`NO_DATA` para cero filas o
       `suggestions`; `ERROR` sólo para fallos técnicos, sea cual sea el proveedor — un `401` de
       `OPENAI_API_KEY` inválida o un `403` de entitlement de Cortex son igual de `ERROR`),
@@ -239,7 +239,7 @@ correspondiente con los campos mínimos de FR-007.
 
 ### Tests (ANTES de la implementación)
 
-- [ ] T022 [US3] Crear `tests/test_telemetry.py`, marcado con `writes_db` (marker ya existente en
+- [X] T022 [US3] Crear `tests/test_telemetry.py`, marcado con `writes_db` (marker ya existente en
       `pyproject.toml`): verifica que una invocación inserta exactamente una fila; que están los
       campos mínimos de FR-007; y las reglas de integridad de
       [data-model.md](./data-model.md) (`STATUS` en el enum, `ERROR_MESSAGE` no nulo ⟺ `ERROR`,
@@ -249,32 +249,35 @@ correspondiente con los campos mínimos de FR-007.
 
 ### Implementación
 
-- [ ] T023 [US3] Modificar `snowflake/001_bootstrap.sql`, sección 6: añadir
+- [X] T023 [US3] Modificar `snowflake/001_bootstrap.sql`, sección 6: añadir
       `GRANT CREATE TABLE, CREATE VIEW ON SCHEMA CICD_DEMO.DEVOPS TO ROLE CICD_DEMO_ROLE;`.
       Sin esto T025 falla (D-04).
-- [ ] T024 [US3] Crear `snowflake/005_telemetry.sql` con `AGENT_TELEMETRY`
+- [X] T024 [US3] Crear `snowflake/005_telemetry.sql` con `AGENT_TELEMETRY`
       (`CREATE TABLE IF NOT EXISTS`, **nunca** `CREATE OR REPLACE`: el histórico no se puede
       perder, incluidas las columnas `PROVIDER` y `COST_UNIT`) y `V_AGENT_ACTIVITY`
       (`CREATE OR REPLACE`), copiando el DDL de
       [contracts/telemetry-table.md](./contracts/telemetry-table.md) y siguiendo la cabecera de
       estilo de `snowflake/004_semantic_view.sql`.
-- [ ] T025 [US3] Desplegar `001_bootstrap.sql` (requiere `ACCOUNTADMIN`) y `005_telemetry.sql` con
+- [X] T025 [US3] Desplegar `001_bootstrap.sql` (requiere `ACCOUNTADMIN`) y `005_telemetry.sql` con
       `snow sql -f ... -c cicd_demo` desde la raíz del repo. Verificar con
       `SELECT COUNT(*) FROM CICD_DEMO.DEVOPS.AGENT_TELEMETRY;` y que `V_AGENT_ACTIVITY` resuelve.
-- [ ] T026 [US3] En `src/conversational_analytics/telemetry.py`: implementar `SnowflakeTelemetry`
+      (2026-09-02: ambos desplegados, `V_AGENT_ACTIVITY` resuelve.)
+- [X] T026 [US3] En `src/conversational_analytics/telemetry.py`: implementar `SnowflakeTelemetry`
       con el `INSERT` parametrizado en `CICD_DEMO.DEVOPS.AGENT_TELEMETRY`, resolviendo
       `COMMIT_SHA` desde `GITHUB_SHA` o `git rev-parse HEAD`, `ACTOR` desde el usuario del sistema,
       y `ESTIMATED_COST`/`COST_UNIT` con `estimated_cost()` de T008 (usa
       `OPENAI_PRICE_PER_MTOKEN` o `CORTEX_PRICE_PER_MTOKEN` según `PROVIDER`). Un fallo al
       escribir telemetría **no** puede tumbar una respuesta correcta: se registra el problema y
       se sigue.
-- [ ] T027 [US3] En `src/conversational_analytics/agent.py`: instrumentar `ask()` para construir
+- [X] T027 [US3] En `src/conversational_analytics/agent.py`: instrumentar `ask()` para construir
       el `TelemetryEvent` (incluidos `PROVIDER` y `COST_UNIT`) y llamar a `telemetry.record()` en
       **todas** las rutas de salida, también en `ERROR` (US3, escenario 2). Poner
       `SnowflakeTelemetry` como valor por defecto cuando el parámetro `telemetry` es `None`.
-- [ ] T028 [US3] Ejecutar `tests/test_telemetry.py` en verde y validar SC-003 con la consulta del
+- [X] T028 [US3] Ejecutar `tests/test_telemetry.py` en verde y validar SC-003 con la consulta del
       paso 7 de [quickstart.md](./quickstart.md): tras la suite de evaluación debe haber una fila
       por invocación, incluidas las `NO_DATA`.
+      (2026-09-02: `tests/test_telemetry.py` — 2 passed. `V_AGENT_ACTIVITY` muestra una fila `OK`
+      y una `NO_DATA`, ambas con `USED_VERIFIED_QUERY`, tokens y latencia.)
 
 **Checkpoint**: las tres historias completas. El Principio IV deja de ser una promesa.
 
@@ -282,10 +285,10 @@ correspondiente con los campos mínimos de FR-007.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T029 [P] Añadir a `snowflake/README.md` la sección de telemetría con las consultas de
+- [X] T029 [P] Añadir a `snowflake/README.md` la sección de telemetría con las consultas de
       demostración de [contracts/telemetry-table.md](./contracts/telemetry-table.md), incluida la
       agrupación por `PROVIDER`/`COST_UNIT` para no sumar USD y créditos.
-- [ ] T030 [P] Añadir al `README.md` raíz la sección del agente: cómo invocarlo, el diagrama de
+- [X] T030 [P] Añadir al `README.md` raíz la sección del agente: cómo invocarlo, el diagrama de
       flujo del plan (incluido `llm_provider.py`) y el guion de demo de siete pasos del paso 8 de
       [quickstart.md](./quickstart.md) (SC-004).
 - [ ] T031 Medir el coste de una ejecución completa de la suite de evaluación con
