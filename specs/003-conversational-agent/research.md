@@ -153,6 +153,12 @@ tiene ninguno habilitado (D-11).
 la región de `GNTUAOQ-YO01002`, se activa *cross-region inference* a nivel de cuenta. Es un cambio
 de parámetro de cuenta, no de código, y hay que documentarlo en `snowflake/manual/`.
 
+**Evidencia de verificación (T004, 2026-09-02)**: el modelo configurado en `AZURE_OPENAI_DEPLOYMENT`
+(`gpt-5.4-mini`, vía Azure OpenAI Service — ver D-11) soporta `tools`/*function calling*; confirmado
+end-to-end en la suite de tests del agente. Nota aparte: este modelo requiere `max_completion_tokens`
+en la llamada de comprobación de `cli.py --check`, no `max_tokens` (los modelos más antiguos de la
+familia GPT-4 aceptan ambos, los más recientes solo el primero).
+
 ---
 
 ## D-06 — Telemetría: tabla propia en `DEVOPS`, escrita por el agente
@@ -180,16 +186,17 @@ resolvió con una de las `AI_VERIFIED_QUERIES` definidas en la feature 002. Es u
 gratis, en runtime, sin LLM juez ni etiquetado manual, y daría la métrica `% de preguntas resueltas
 por verified query`.
 
-**Limitación conocida (verificada empíricamente el 2026-09-02, no bloquea esta feature)**: las
-`AI_VERIFIED_QUERIES` de `SV_PHARMA_SALES` (feature 002) referencian nombres físicos de tabla.
-Cortex Analyst las descarta con un warning por cada una (*"Verified query 'Q01_...' referred to
-physical tables. The sql query was transformed to use logical table names"*) y genera él mismo el
-SQL correcto con nombres lógicos (`__sale`, `__product`, `__country`). Consecuencia:
-`verified_query_used` será **siempre `NULL`** hasta que se reescriban las verified queries de la
-002 — la columna `USED_VERIFIED_QUERY` y la métrica `PCT_VERIFIED` quedan en `0%` mientras tanto,
-sin que eso signifique que las respuestas sean incorrectas (Cortex Analyst genera SQL válido de
-todas formas, ver D-07). Se documenta aquí para que no se interprete como un bug de esta feature;
-la corrección pertenece a la feature 002 y queda fuera de alcance.
+**Limitación conocida — RESUELTA (2026-09-02)**: las `AI_VERIFIED_QUERIES` de `SV_PHARMA_SALES`
+(feature 002) referenciaban nombres físicos de tabla. Cortex Analyst las descartaba con un
+warning por cada una (*"Verified query 'Q01_...' referred to physical tables. The sql query was
+transformed to use logical table names"*) y generaba él mismo el SQL correcto con nombres
+lógicos, dejando `verified_query_used` siempre `NULL`. Se reescribieron las 11 verified queries
+de la feature 002 para usar `SEMANTIC_VIEW(CICD_DEMO.DATA.SV_PHARMA_SALES ...)` con el nombre
+completamente cualificado (ver D-11 en `specs/002-cortex-semantic-view/research.md` — reabre y
+corrige D-08 de esa feature). Verificado empíricamente con dos preguntas reales (incluida la de
+"qué área terapéutica creció más", la misma que causaba la variabilidad documentada más abajo en
+esta sección): `verified_query_used` ya se rellena y no hay warnings. `USED_VERIFIED_QUERY` y
+`PCT_VERIFIED` en la telemetría dejan de estar siempre en `0%`.
 
 **Nueva columna por la constitución v2.0.0**: `PROVIDER` (`openai` | `cortex`) y `COST_UNIT`
 (`USD` | `CREDITS`), porque el Principio IV exige declarar proveedor, modelo y unidad del coste.
@@ -321,3 +328,15 @@ sobre-ingeniería para dos casos (Principio I).
 
 **Consecuencias documentadas en otras decisiones**: D-03 (autenticación), D-05 (modelo), D-06
 (columnas `PROVIDER`/`COST_UNIT` en telemetría), D-08 (test de coherencia en vez de anti-fuga).
+
+**Evidencia de verificación (T004, 2026-09-02)**: con `LLM_PROVIDER=openai` y una credencial real
+(en este caso una key de **Azure OpenAI Service**, no la API pública de `api.openai.com`),
+`client.chat.completions.create(...)` responde y **devuelve `tool_calls`** al pasarle el `tools`
+de `query_semantic_view`; confirmado tanto con `cli.py --check` como con la suite completa de
+`test_agent_evaluation.py`/`test_agent_contract.py` (14-17 de 17 tests en verde según la corrida,
+ver notas de implementación). Azure se trata como un *backend* dentro de `LLM_PROVIDER=openai`
+(detectado por la presencia de `AZURE_OPENAI_ENDPOINT`; usa `AzureOpenAI(...)` del SDK `openai` en
+vez de `OpenAI(...)`, con `model=<AZURE_OPENAI_DEPLOYMENT>`), no un tercer valor de `LLM_PROVIDER`:
+el `provider` reportado en telemetría sigue siendo `"openai"`. No se repitió la prueba contra
+`/api/v2/cortex/v1/chat/completions` en esta fecha — la entitlement de cuenta documentada arriba
+(403 en las 6 pruebas del 2026-09-02) no ha cambiado y no hay motivo para asumir que sí.
