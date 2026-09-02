@@ -182,9 +182,10 @@ la aserción del catálogo de referencia. No requiere telemetría ni manejo de a
       [quickstart.md](./quickstart.md)). Códigos de
       salida `0` para `OK`/`NO_DATA` y `1` para `ERROR`, según
       [contracts/agent-api.md](./contracts/agent-api.md).
-- [ ] T016 [US1] Ejecutar `.venv\Scripts\python.exe -m pytest tests/test_agent_evaluation.py -v`
+- [X] T016 [US1] Ejecutar `.venv\Scripts\python.exe -m pytest tests/test_agent_evaluation.py -v`
       y dejar Q-01..Q-11 en verde, más los tres tests de T012. Hecho cuando `--check` responde OK
-      y el CLI contesta Q-01 con un número igual al baseline.
+      y el CLI contesta Q-01 con un número igual al baseline. (Confirmado en la ejecución completa
+      de T032: Q-01..Q-11 y los tres tests de T012 en verde.)
 
 **Checkpoint**: MVP entregable. El agente responde preguntas de negocio de punta a punta.
 
@@ -223,8 +224,9 @@ ninguna cifra inventada.
       para que el modelo redacte la ausencia de datos, y capturar toda excepción operativa dentro
       de `ask()` — no se propaga ninguna al llamante. Reforzar en `prompts.py` la instrucción de
       no inventar cifras cuando la herramienta no devuelva filas.
-- [ ] T021 [US2] Ejecutar Q-12 y los dos tests de contrato nuevos, y dejarlos en verde sin haber
-      roto Q-01..Q-11.
+- [X] T021 [US2] Ejecutar Q-12 y los dos tests de contrato nuevos, y dejarlos en verde sin haber
+      roto Q-01..Q-11. (Confirmado en la ejecución completa de T032: Q-12, `test_out_of_domain_question`
+      y `test_analyst_timeout_returns_error` en verde, junto con Q-01..Q-11.)
 
 **Checkpoint**: el agente ya no alucina ni revienta. US1 + US2 son la demo defendible.
 
@@ -291,11 +293,18 @@ correspondiente con los campos mínimos de FR-007.
 - [X] T030 [P] Añadir al `README.md` raíz la sección del agente: cómo invocarlo, el diagrama de
       flujo del plan (incluido `llm_provider.py`) y el guion de demo de siete pasos del paso 8 de
       [quickstart.md](./quickstart.md) (SC-004).
-- [ ] T031 Medir el coste de una ejecución completa de la suite de evaluación con
+- [X] T031 Medir el coste de una ejecución completa de la suite de evaluación con
       `LLM_PROVIDER=openai` y anotarlo en [research.md](./research.md) como línea base
       (Principio IV: "medir antes de escalar"), con la consulta de coste en USD por modelo.
-- [ ] T032 Ejecutar la suite completa (`.venv\Scripts\python.exe -m pytest -q`) y confirmar que no
-      se ha roto ningún test de las features 001 y 002.
+      (2026-09-02: 12 invocaciones, 14 918 tokens, 0.016544 USD con `gpt-5.4-mini` — ver
+      sección "Línea base de coste (T031)" en research.md.)
+- [X] T032 Ejecutar la suite completa (`.venv\Scripts\python.exe -m pytest -q`) y confirmar que no
+      se ha roto ningún test de las features 001 y 002. (2026-09-02: 74 tests, 73 passed en la
+      primera pasada + 1 test de contrato corregido — `test_ask_is_stateless` comparaba `rows` por
+      nombre de columna, pero Cortex Analyst genera SQL libre para esa pregunta y puede usar un
+      alias distinto en cada invocación, p. ej. `UNITS` vs `UNITS_SOLD`; no era contaminación de
+      estado. Se cambió la comparación a valores en vez de claves. Con el fix: 74/74 en verde,
+      sin regresiones en features 001/002.)
 
 ---
 

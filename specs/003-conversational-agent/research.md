@@ -340,3 +340,47 @@ vez de `OpenAI(...)`, con `model=<AZURE_OPENAI_DEPLOYMENT>`), no un tercer valor
 el `provider` reportado en telemetría sigue siendo `"openai"`. No se repitió la prueba contra
 `/api/v2/cortex/v1/chat/completions` en esta fecha — la entitlement de cuenta documentada arriba
 (403 en las 6 pruebas del 2026-09-02) no ha cambiado y no hay motivo para asumir que sí.
+
+---
+
+## Línea base de coste (T031, 2026-09-02)
+
+**Medición**: ejecución completa de las 12 preguntas de referencia (Q-01..Q-12) contra `ask()`
+con `LLM_PROVIDER=openai` (backend Azure OpenAI Service, modelo `gpt-5.4-mini`) y telemetría real
+(`SnowflakeTelemetry`, no `NullTelemetry` — los tests de la suite usan `NullTelemetry` para no
+ensuciar la tabla en cada corrida, ver D-06, así que esta medición se hizo con un script aparte
+que invoca `ask()` directamente). Consulta de coste (ver paso 7 de
+[quickstart.md](./quickstart.md)):
+
+```sql
+SELECT PROVIDER, MODEL, COST_UNIT,
+       COUNT(*) AS INVOCATIONS,
+       SUM(TOTAL_TOKENS) AS TOKENS,
+       ROUND(SUM(ESTIMATED_COST), 6) AS COST,
+       ROUND(100.0 * SUM(IFF(USED_VERIFIED_QUERY, 1, 0)) / COUNT(*), 1) AS PCT_VERIFIED
+FROM CICD_DEMO.DEVOPS.V_AGENT_ACTIVITY
+GROUP BY PROVIDER, MODEL, COST_UNIT;
+```
+
+**Resultado**:
+
+| PROVIDER | MODEL | COST_UNIT | INVOCATIONS | TOKENS | COST | PCT_VERIFIED |
+|---|---|---|---|---|---|---|
+| openai | gpt-5.4-mini | USD | 12 | 14 918 | 0.016544 | 0.0 |
+
+**Lectura**: ~0.0017 USD por pregunta de media (12 preguntas ≈ 14.9k tokens totales, entrada+salida,
+dos llamadas al modelo por pregunta como mínimo). Para la demo completa (5-7 preguntas en vivo) el
+coste es de céntimos de dólar — irrelevante operativamente, coherente con el Principio IV
+("observar y controlar", no "el coste bloquea la demo").
+
+**Hallazgo colateral, no bloqueante**: `PCT_VERIFIED = 0.0` en esta corrida — ninguna de las 12
+preguntas en **español** usó una `AI_VERIFIED_QUERY` de la feature 002, pese a que D-11 (ver
+`specs/002-cortex-semantic-view/research.md`) documenta el fix de las verified queries como
+resuelto y verificado con `generate_sql()` directo. Hipótesis más probable: las verified queries
+tienen su campo `QUESTION` en **inglés** (p. ej. *"Which therapeutic area grew the most..."*) y el
+matching semántico de Cortex Analyst pondera la similitud de idioma/frase, no solo la intención;
+las 12 preguntas de referencia están en español. No se investiga más a fondo aquí (fuera de
+alcance de T031, que solo pide medir el coste) — queda anotado como posible mejora futura de la
+feature 002: traducir o duplicar el campo `QUESTION` de las verified queries al español, o
+verificar empíricamente si el idioma realmente afecta el matching.
+

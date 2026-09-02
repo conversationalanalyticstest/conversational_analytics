@@ -127,14 +127,18 @@ modelo y del proveedor, y guardar el coste congelado al momento de la invocació
 cambio futuro de tarifas reescriba la historia.
 
 ```text
-ESTIMATED_COST = (PROMPT_TOKENS + COMPLETION_TOKENS) / 1_000_000 * PRICE_PER_MTOKEN[PROVIDER][MODEL]
+ESTIMATED_COST = PROMPT_TOKENS / 1_000_000 * PRICE_PER_MTOKEN[PROVIDER][MODEL].input
+                + COMPLETION_TOKENS / 1_000_000 * PRICE_PER_MTOKEN[PROVIDER][MODEL].output
 ```
 
 `PRICE_PER_MTOKEN` es una constante en `telemetry.py`, con dos tablas de tarifas separadas: una en
 **USD** (precios públicos de OpenAI por modelo) y otra en **créditos de Snowflake** (para cuando
-`LLM_PROVIDER=cortex`; el precio del crédito en euros depende del contrato). `COST_UNIT` deja
-explícito con cuál se calculó cada fila, para que no se sumen valores en unidades distintas por
-error. Si el modelo no está en la tabla correspondiente, se registra `NULL` en vez de fallar la
+`LLM_PROVIDER=cortex`; el precio del crédito en euros depende del contrato). Cada entrada es un
+par `(precio_entrada, precio_salida)` por millón de tokens — algunos modelos tienen el mismo
+precio en ambos, otros no (p. ej. `gpt-5.4-mini`: 0.75 USD/M entrada, 4.50 USD/M salida). No se
+modela el precio de tokens en caché ("cached input") por simplicidad (Principio I). `COST_UNIT`
+deja explícito con cuál se calculó cada fila, para que no se sumen valores en unidades distintas
+por error. Si el modelo no está en la tabla correspondiente, se registra `NULL` en vez de fallar la
 invocación — una tarifa desconocida no puede tumbar una respuesta correcta.
 
 ### Vista `V_AGENT_ACTIVITY`

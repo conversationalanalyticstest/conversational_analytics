@@ -18,7 +18,7 @@ fichero es su punto de partida.
 | Q-02 | ¿Cuántas unidades vendimos de Respiralia en Alemania en 2024? | Filtro multidimensional | marca, país, tiempo | Un único entero `> 0` |
 | Q-03 | ¿Cuál es el top 5 de marcas por ventas netas en Europa? | Ranking | marca, región | 5 filas, valores distintos, orden descendente |
 | Q-04 | Compara las ventas netas de Human Pharma y Animal Health en 2025. | Comparativa categórica | unidad de negocio, tiempo | 2 filas, ambas `> 0` |
-| Q-05 | ¿Qué área terapéutica creció más en ventas netas de 2024 a 2025? | Comparativa interanual | área terapéutica, tiempo | 1 área, variación no nula |
+| Q-05 | ¿En qué área terapéutica aumentaron más las ventas netas, en euros, de 2024 a 2025? | Comparativa interanual | área terapéutica, tiempo | 1 área, variación no nula |
 | Q-06 | Evolución mensual de las unidades de Cardiovex en España durante 2025. | Serie temporal | marca, país, tiempo | 12 filas, una por mes, sin huecos |
 | Q-07 | ¿En qué canal es mayor el descuento medio como porcentaje de las ventas brutas? | Métrica derivada + ranking | canal | 1 canal, ratio entre 0 y 0.40 |
 | Q-08 | Ventas netas por región en el cuarto trimestre de 2025. | Filtro temporal parcial | región, tiempo | 4 filas, todas `> 0` |
@@ -34,4 +34,7 @@ fichero es su punto de partida.
   inventada.
 - Q-03, Q-05, Q-07 y Q-09 dependen de que no haya empates. Es lo que garantizan los factores
   diferenciados de la fórmula de generación (invariante I-10).
+- Q-05 pregunta explícitamente por el aumento **en euros** (no en porcentaje) para que no sea
+  ambigua: la verified query desplegada en la feature 002 (`q05_therapeutic_area_highest_growth`)
+  calcula la diferencia absoluta de `NET_SALES` entre 2025 y 2024, no una tasa de crecimiento.
 - Q-06 depende de la rejilla temporal completa (invariante I-11).

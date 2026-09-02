@@ -12,7 +12,9 @@ from typing import Any
 
 import pytest
 
+from conversational_analytics.agent import AgentResponse, ask
 from conversational_analytics.db import get_connection
+from conversational_analytics.telemetry import NullTelemetry
 
 
 @pytest.fixture(scope="session")
@@ -59,3 +61,26 @@ def scalar(fetch_one: Callable[[str], tuple[Any, ...] | None]) -> Callable[[str]
         return row[0]
 
     return _scalar
+
+
+@pytest.fixture(scope="session")
+def null_telemetry() -> NullTelemetry:
+    """Implementacion no-op de `Telemetry`, para no escribir en Snowflake en cada test."""
+    return NullTelemetry()
+
+
+@pytest.fixture(scope="session")
+def agent_answer(null_telemetry: NullTelemetry) -> Callable[[str], AgentResponse]:
+    """Invoca `ask()` una vez por pregunta y cachea la respuesta durante toda la sesion.
+
+    Varios modulos de test comparten preguntas (evaluacion, contrato); volver a preguntar lo
+    mismo pagaria tokens reales de mas sin aportar cobertura (Principio IV).
+    """
+    cache: dict[str, AgentResponse] = {}
+
+    def _agent_answer(question: str) -> AgentResponse:
+        if question not in cache:
+            cache[question] = ask(question, telemetry=null_telemetry, source="test")
+        return cache[question]
+
+    return _agent_answer
