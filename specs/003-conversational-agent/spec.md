@@ -103,9 +103,11 @@ de si la pregunta tuvo o no datos.
 - **FR-002**: El sistema MUST resolver la pregunta consultando exclusivamente la semantic view
   `SV_PHARMA_SALES` (feature 002), sin acceder a las tablas base directamente ni construir SQL
   a mano fuera de lo que genera Cortex Analyst.
-- **FR-003**: El sistema MUST usar el SDK de OpenAI configurado contra el endpoint de Cortex de
-  Snowflake para la generación de la consulta y la respuesta en lenguaje natural (Restricción
-  Tecnológica de la constitución) — NO la API pública de OpenAI.
+- **FR-003**: El sistema MUST usar el SDK de OpenAI para la orquestación (decidir cuándo
+  consultar la semantic view y redactar la respuesta en lenguaje natural), apuntable a la API
+  pública de OpenAI o al endpoint de Cortex según lo que la cuenta de Snowflake tenga habilitado
+  (Restricción Tecnológica de la constitución, v2.0.0). La traducción de la pregunta a SQL MUST
+  hacerse siempre con Cortex Analyst, sin excepción.
 - **FR-004**: El sistema MUST responder correctamente, con el valor esperado, a cada una de las
   11 preguntas satisfacibles del catálogo de referencia (Q-01 a Q-11).
 - **FR-005**: El sistema MUST responder a preguntas fuera de rango (Q-12 y equivalentes)
@@ -113,12 +115,13 @@ de si la pregunta tuvo o no datos.
   no controlado.
 - **FR-006**: El sistema MUST tratar cada invocación como un turno independiente, sin conservar
   ni usar contexto de preguntas anteriores (arquitectura stateless de la constitución).
-- **FR-007**: El sistema MUST registrar cada invocación con, como mínimo: timestamp, pregunta,
-  SQL generado, respuesta, tokens de entrada/salida, coste estimado, latencia y estado
-  (éxito/sin datos/error).
-- **FR-008**: El sistema MUST leer las credenciales de Snowflake y del endpoint de Cortex desde
-  variables de entorno, reutilizando el mecanismo ya existente en `src/conversational_analytics/db.py`
-  (Principio V), sin credenciales embebidas en código.
+- **FR-007**: El sistema MUST registrar cada invocación con, como mínimo: timestamp, origen,
+  pregunta, SQL generado, respuesta, tokens de entrada/salida, coste estimado (con su unidad y
+  proveedor), latencia, estado (éxito/sin datos/error) y versión del agente (commit SHA).
+- **FR-008**: El sistema MUST leer las credenciales de Snowflake, de Cortex y, si aplica, del
+  proveedor de orquestación (OpenAI) desde variables de entorno, reutilizando el mecanismo ya
+  existente en `src/conversational_analytics/db.py` (Principio V), sin credenciales embebidas en
+  código.
 - **FR-009**: El sistema MUST devolver un mensaje de fallo de servicio, no una respuesta
   inventada, cuando Cortex Analyst no responde o responde con error.
 - **FR-010**: El conjunto de tests de evaluación del agente (Principio II) MUST cubrir las 12

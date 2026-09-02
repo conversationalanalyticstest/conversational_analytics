@@ -71,34 +71,46 @@ instalación falla: no hay compilador C en esta máquina. En ese caso, recrear e
 
 ## 3. Variables de entorno
 
-Al `.env` existente se añaden dos, ambas opcionales:
+Al `.env` existente se añaden, según el proveedor elegido (`LLM_PROVIDER`, D-11):
 
 ```ini
-# Nuevas en la feature 003 (opcionales, tienen valor por defecto)
-CORTEX_MODEL=<modelo verificado en la tarea de arranque>
+# Por defecto hoy: LLM_PROVIDER=openai (la cuenta Snowflake de esta demo es trial
+# y no tiene inferencia Cortex habilitada, ver research.md D-11)
+LLM_PROVIDER=openai
+OPENAI_API_KEY=<clave real, nunca commitear>
+OPENAI_MODEL=gpt-4.1-mini
+
+# Alternativa, si una cuenta de pago habilita Cortex:
+# LLM_PROVIDER=cortex
+# CORTEX_MODEL=<modelo verificado en la tarea de arranque>
+
+# Opcional en ambos casos
 SNOWFLAKE_SEMANTIC_VIEW=CICD_DEMO.DATA.SV_PHARMA_SALES
 ```
 
-**No se añade `OPENAI_API_KEY`.** Su ausencia es un invariante verificado por
-`test_no_openai_api_key_needed`. Si aparece en tu `.env`, el test falla — a propósito.
+**Con `LLM_PROVIDER=cortex`, `OPENAI_API_KEY` no debe existir en `.env`.** Es un invariante
+verificado por `test_provider_matches_config` (D-08): si aparece cuando no toca, el test falla a
+propósito.
 
-## 4. Verificar modelo y conectividad antes de nada
+## 4. Verificar proveedor, modelo y conectividad antes de nada
 
-Primera tarea real de la implementación (D-05): confirmar qué modelo está disponible en la región
-de la cuenta y soporta `tools`.
+Primera tarea real de la implementación (D-05, D-11): confirmar que el proveedor configurado
+responde y que el modelo soporta `tools`.
 
 ```powershell
 .venv\Scripts\python.exe -m conversational_analytics.cli --check
 ```
 
-Debe reportar: modelo efectivo, que el endpoint de chat completions responde y que el de Cortex
-Analyst responde. Fallos esperables y su causa:
+Debe reportar: proveedor efectivo (`openai` o `cortex`), modelo efectivo, que el endpoint de chat
+completions responde y que Cortex Analyst responde. Fallos esperables y su causa:
 
 | Error | Causa probable |
 |---|---|
-| `401` | PAT caducado |
-| `403` | Falta `SNOWFLAKE.CORTEX_USER` en el **rol por defecto** (paso 1.2) |
-| `400` modelo no disponible | Modelo no habilitado en la región → probar otro o activar *cross-region inference* |
+| `401` en el orquestador | `OPENAI_API_KEY` inválida o caducada (si `LLM_PROVIDER=openai`), o PAT caducado (si `cortex`) |
+| `401` en Cortex Analyst | PAT caducado |
+| `403` en Cortex Analyst | Falta `SNOWFLAKE.CORTEX_USER` en el **rol por defecto** (paso 1.2) |
+| `403` en el orquestador con `LLM_PROVIDER=cortex` | Cuenta sin entitlement de inferencia Cortex (verificado en esta cuenta, D-11) — cambiar a `LLM_PROVIDER=openai` |
+| `400` modelo no disponible | Con `cortex`: modelo no habilitado en la región → probar otro o activar *cross-region inference* |
 
 ## 5. Hacer una pregunta
 
@@ -141,7 +153,8 @@ Esperado: mensaje explícito de ausencia de datos, sin cifra inventada, y códig
 Los asserts van sobre las filas devueltas por el SQL, no sobre el texto redactado (D-07). Un test
 que falla aquí bloquea el despliegue; no se desactiva (Flujo de Desarrollo de la constitución).
 
-Cada ejecución consume tokens de Cortex reales. La suite completa son ~12 invocaciones con al menos
+Cada ejecución consume tokens reales del proveedor configurado (OpenAI por defecto, o Cortex si
+`LLM_PROVIDER=cortex`). La suite completa son ~12 invocaciones con al menos
 dos llamadas al modelo cada una.
 
 ## 7. Comprobar la telemetría (Principio IV)
@@ -161,12 +174,18 @@ Debe haber una fila por invocación, incluidas las de estado `NO_DATA`.
 Coste acumulado y señal de calidad:
 
 ```sql
-SELECT COUNT(*) AS INVOCATIONS,
+SELECT PROVIDER,
+       COST_UNIT,
+       COUNT(*) AS INVOCATIONS,
        SUM(TOTAL_TOKENS) AS TOKENS,
-       ROUND(SUM(ESTIMATED_COST), 4) AS CREDITS,
+       ROUND(SUM(ESTIMATED_COST), 4) AS COST,
        ROUND(100.0 * SUM(IFF(USED_VERIFIED_QUERY, 1, 0)) / COUNT(*), 1) AS PCT_VERIFIED
-FROM CICD_DEMO.DEVOPS.V_AGENT_ACTIVITY;
+FROM CICD_DEMO.DEVOPS.V_AGENT_ACTIVITY
+GROUP BY PROVIDER, COST_UNIT;
 ```
+
+`PCT_VERIFIED` será `0%` hasta que se corrijan las `AI_VERIFIED_QUERIES` de la feature 002 (defecto
+conocido, no bloquea esta feature — ver research.md D-06).
 
 Más consultas en [contracts/telemetry-table.md](./contracts/telemetry-table.md).
 
@@ -177,22 +196,27 @@ Cinco minutos, un fichero por paso:
 | Paso | Fichero | Qué se enseña |
 |---|---|---|
 | 1 | `cli.py` | Entra una pregunta |
-| 2 | `agent.py` | El SDK de OpenAI, apuntando a Cortex, decide llamar a la herramienta |
-| 3 | `cortex_analyst.py` | La herramienta pide el SQL a Cortex Analyst con la semantic view |
-| 4 | `db.py` | Se ejecuta el SQL — Cortex Analyst no lo ejecuta él |
-| 5 | `agent.py` | El modelo redacta la respuesta con las filas |
-| 6 | `V_AGENT_ACTIVITY` | Todo ha quedado registrado en Snowflake |
+| 2 | `llm_provider.py` | Se construye el cliente según `LLM_PROVIDER` — hoy OpenAI público |
+| 3 | `agent.py` | El SDK de OpenAI decide llamar a la herramienta |
+| 4 | `cortex_analyst.py` | La herramienta pide el SQL a Cortex Analyst con la semantic view |
+| 5 | `db.py` | Se ejecuta el SQL — Cortex Analyst no lo ejecuta él |
+| 6 | `agent.py` | El modelo redacta la respuesta con las filas |
+| 7 | `V_AGENT_ACTIVITY` | Todo ha quedado registrado en Snowflake, incluido qué proveedor se usó |
 
-Punto que suele sorprender a la audiencia: no hay ninguna clave de OpenAI en ningún sitio. Enseñar
-`test_no_openai_api_key_needed` cierra la explicación.
+Punto que suele sorprender a la audiencia: la traducción a SQL sigue pasando siempre por Cortex
+Analyst, dentro de Snowflake — sólo la redacción final puede salir a OpenAI, y queda declarado en
+cada fila de telemetría (`PROVIDER`). Enseñar `test_provider_matches_config` cierra la explicación.
 
 ## Resolución de problemas
 
 | Síntoma | Causa | Solución |
 |---|---|---|
-| `403` en Cortex, conector OK | Rol por defecto del usuario | Paso 1.2 |
+| `403` en Cortex Analyst, conector OK | Rol por defecto del usuario | Paso 1.2 |
+| `403` en el orquestador con `LLM_PROVIDER=cortex` | Cuenta sin entitlement de inferencia Cortex | Cambiar a `LLM_PROVIDER=openai` (D-11) |
 | `401` en todo a la vez | PAT caducado | Regenerar y actualizar `.env` y `pat.txt` |
-| El modelo nunca llama a la herramienta | El modelo no soporta `tools` | Cambiar `CORTEX_MODEL` (D-05) |
+| `401` sólo en el orquestador | `OPENAI_API_KEY` inválida | Regenerar en `platform.openai.com` |
+| El modelo nunca llama a la herramienta | El modelo no soporta `tools` | Cambiar `OPENAI_MODEL`/`CORTEX_MODEL` (D-05) |
 | `SQL compilation error` con la vista de telemetría | Falta el grant del paso 1.1 | Reejecutar `001_bootstrap.sql` |
 | `snow` se cuelga o falla intermitentemente | Terminal degradado | Abrir un terminal nuevo y reintentar |
 | Tests de evaluación intermitentes | Aserciones sobre la prosa, no sobre las filas | Corregir el test: viola D-07 |
+| `PCT_VERIFIED` siempre en 0% | Verified queries de la feature 002 con nombres físicos | Defecto conocido, fuera de alcance (D-06); no bloquea |

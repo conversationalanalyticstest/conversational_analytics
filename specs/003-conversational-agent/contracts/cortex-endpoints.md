@@ -1,46 +1,71 @@
-# Contrato: endpoints de Cortex
+# Contrato: endpoints del orquestador y de Cortex Analyst
 
-**Feature**: `003-conversational-agent` | **Fecha**: 2026-09-01 | **Fase**: 1
+**Feature**: `003-conversational-agent` | **Fecha**: 2026-09-01 (revisado 2026-09-02) | **Fase**: 1
 
-Formato exacto de las dos llamadas a Snowflake que hace el agente. Documentado aquí porque el
-segundo endpoint **no** es compatible con OpenAI y su formato no es adivinable.
+Formato exacto de las llamadas que hace el agente: el orquestador (proveedor configurable, D-11)
+y Cortex Analyst (propietario Snowflake, su formato no es adivinable).
 
-Base común: `https://<SNOWFLAKE_ACCOUNT>.snowflakecomputing.com`, con
+Base común de Snowflake: `https://<SNOWFLAKE_ACCOUNT>.snowflakecomputing.com`, con
 `SNOWFLAKE_ACCOUNT = GNTUAOQ-YO01002`.
 
-Ambos endpoints se autentican con el **mismo `SNOWFLAKE_PAT`** que ya usa `db.py` (D-03). No hay
-credenciales nuevas.
+Cortex Analyst se autentica **siempre** con el `SNOWFLAKE_PAT` que ya usa `db.py` (D-03). El
+orquestador se autentica según `LLM_PROVIDER`: `OPENAI_API_KEY` si es `openai` (por defecto),
+o el mismo `SNOWFLAKE_PAT` si es `cortex` — ninguna combinación introduce dos secretos nuevos.
 
 ---
 
-## 1. Orquestador — `/api/v2/cortex/v1/chat/completions`
+## 1. Orquestador — API de chat completions, compatible con OpenAI
 
-Compatible con OpenAI. Se consume con el SDK `openai`, **nunca con HTTP a mano**: es lo que exige
-la Restricción Tecnológica de la constitución.
+Se consume con el SDK `openai`, **nunca con HTTP a mano**: es lo que exige la Restricción
+Tecnológica de la constitución (v2.0.0). El proveedor de destino es configurable por
+`LLM_PROVIDER` y se resuelve en un único punto, `build_llm_client()` (D-11): no hay dos rutas de
+código distintas en `agent.py`, sólo un cliente ya construido.
 
 ### Construcción del cliente
 
 ```python
+# src/conversational_analytics/llm_provider.py
+
+import os
 from openai import OpenAI
 
-client = OpenAI(
-    api_key=os.environ["SNOWFLAKE_PAT"],
-    base_url=f"https://{os.environ['SNOWFLAKE_ACCOUNT']}.snowflakecomputing.com/api/v2/cortex/v1",
-    timeout=60.0,
-)
+DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+DEFAULT_CORTEX_MODEL = "openai-gpt-4.1"  # verificar disponibilidad antes de fijarlo (D-05)
+
+
+def build_llm_client() -> tuple[OpenAI, str, str]:
+    """Devuelve (client, provider, model) segun LLM_PROVIDER."""
+    provider = os.environ.get("LLM_PROVIDER", "openai")
+
+    if provider == "cortex":
+        account = os.environ["SNOWFLAKE_ACCOUNT"]
+        client = OpenAI(
+            api_key=os.environ["SNOWFLAKE_PAT"],
+            base_url=f"https://{account}.snowflakecomputing.com/api/v2/cortex/v1",
+            timeout=60.0,
+        )
+        model = os.environ.get("CORTEX_MODEL", DEFAULT_CORTEX_MODEL)
+        return client, provider, model
+
+    # provider == "openai" (por defecto)
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"], timeout=60.0)
+    model = os.environ.get("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
+    return client, provider, model
 ```
 
-| Detalle | Valor | Por qué importa |
+| Detalle | `openai` (por defecto) | `cortex` (alternativa) |
 |---|---|---|
-| `api_key` | el PAT de Snowflake | No hay `OPENAI_API_KEY` en ningún sitio (D-08) |
-| `base_url` | termina en `/api/v2/cortex/v1` | El SDK le añade `/chat/completions` |
-| `timeout` | 60 s | FR-009: no quedarse colgado |
+| Credencial | `OPENAI_API_KEY` | `SNOWFLAKE_PAT` (sin secreto nuevo) |
+| `base_url` | por defecto del SDK (`api.openai.com`) | `https://<account>.snowflakecomputing.com/api/v2/cortex/v1` |
+| Modelo | `OPENAI_MODEL`, por defecto `gpt-4.1-mini` | `CORTEX_MODEL`, verificado antes de fijarlo (D-05) |
+| Coste | USD, tarifa pública de OpenAI | créditos de Snowflake |
+| Estado en esta cuenta (verificado 2026-09-02) | funciona (conectividad confirmada, 401 con clave falsa) | `403 003001` en los 6 modelos probados — cuenta trial sin esta entitlement |
 
-### Petición
+### Petición (idéntica para los dos proveedores)
 
 ```python
 client.chat.completions.create(
-    model=os.environ.get("CORTEX_MODEL", DEFAULT_MODEL),
+    model=model,
     messages=messages,
     tools=[QUERY_SEMANTIC_VIEW_SCHEMA],
 )
@@ -56,14 +81,17 @@ client.chat.completions.create(
 
 ### Restricciones conocidas
 
-- `tools` (*function calling*) sólo está soportado por parte de los modelos de Cortex —
-  documentación: familias `openai-gpt-*` y Claude. El modelo concreto se verifica antes de escribir
-  código (D-05).
+- Con `LLM_PROVIDER=cortex`, `tools` (*function calling*) sólo está soportado por parte de los
+  modelos de Cortex — documentación: familias `openai-gpt-*` y Claude. El modelo concreto se
+  verifica antes de escribir código (D-05). **Esta cuenta en concreto no tiene ninguno
+  habilitado** (ver tabla arriba); es un problema de entitlement, no de nombre de modelo.
 - La **API de Responses no existe** en Cortex. Sólo Chat Completions. Es irrelevante con el SDK
   `openai` a pelo, pero sería un `404` inmediato con `openai-agents` si no se fuerza
   `OpenAIChatCompletionsModel`.
-- Los permisos se resuelven contra el **rol por defecto del usuario**, no contra el rol de la
-  sesión del conector (D-04). Un `403` aquí con el conector funcionando apunta siempre a esto.
+- Con `LLM_PROVIDER=cortex`, los permisos se resuelven contra el **rol por defecto del
+  usuario**, no contra el rol de la sesión del conector (D-04). Un `403` aquí con el conector
+  funcionando apunta siempre a esto — aunque en esta cuenta el `403` real observado es de
+  entitlement, no de rol (D-11).
 
 ---
 
@@ -176,10 +204,15 @@ Nuevas en esta feature. Se añaden a `.env.example` (Principio V).
 
 | Variable | Obligatoria | Defecto | Uso |
 |---|---|---|---|
-| `CORTEX_MODEL` | no | fijado en código tras verificar (D-05) | Modelo del orquestador |
+| `LLM_PROVIDER` | no | `openai` | Selecciona el proveedor del orquestador: `openai` \| `cortex` (D-11) |
+| `OPENAI_API_KEY` | sí, si `LLM_PROVIDER=openai` (defecto) | — | Autentica la API pública de OpenAI |
+| `OPENAI_MODEL` | no | `gpt-4.1-mini` | Modelo del orquestador cuando `LLM_PROVIDER=openai` |
+| `CORTEX_MODEL` | no | fijado en código tras verificar (D-05) | Modelo del orquestador cuando `LLM_PROVIDER=cortex` |
 | `SNOWFLAKE_SEMANTIC_VIEW` | no | `CICD_DEMO.DATA.SV_PHARMA_SALES` | Semantic view del Analyst |
 
 Reutilizadas sin cambios de `db.py`: `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PAT`,
-`SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`, `SNOWFLAKE_SCHEMA`.
+`SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`, `SNOWFLAKE_SCHEMA` — usadas también
+por Cortex Analyst, que **siempre** se autentica con `SNOWFLAKE_PAT` sea cual sea `LLM_PROVIDER`.
 
-**`OPENAI_API_KEY` no se usa, no se declara y no debe existir.**
+**`OPENAI_API_KEY` sólo se lee si `LLM_PROVIDER=openai`.** Con `LLM_PROVIDER=cortex` no hace falta
+y no debe existir en `.env` (lo verifica `test_provider_matches_config`, D-08).

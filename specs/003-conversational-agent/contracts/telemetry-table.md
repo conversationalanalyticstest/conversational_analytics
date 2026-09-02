@@ -43,10 +43,12 @@ CREATE TABLE IF NOT EXISTS AGENT_TELEMETRY (
     ANALYST_REQUEST_ID   STRING,
     SF_QUERY_ID          STRING,
     ROW_COUNT            NUMBER,
-    MODEL                STRING        NOT NULL,
-    PROMPT_TOKENS        NUMBER        NOT NULL,
-    COMPLETION_TOKENS    NUMBER        NOT NULL,
-    ESTIMATED_COST       FLOAT,
+    PROVIDER              STRING        NOT NULL,
+    MODEL                 STRING        NOT NULL,
+    PROMPT_TOKENS         NUMBER        NOT NULL,
+    COMPLETION_TOKENS     NUMBER        NOT NULL,
+    ESTIMATED_COST        FLOAT,
+    COST_UNIT             STRING        NOT NULL,
     LATENCY_MS           NUMBER        NOT NULL,
     STATUS               STRING        NOT NULL,
     ERROR_MESSAGE        STRING,
@@ -89,7 +91,9 @@ SELECT
     COMPLETION_TOKENS,
     PROMPT_TOKENS + COMPLETION_TOKENS AS TOTAL_TOKENS,
     ESTIMATED_COST,
+    COST_UNIT,
     LATENCY_MS,
+    PROVIDER,
     MODEL,
     COMMIT_SHA,
     GENERATED_SQL,
@@ -113,19 +117,23 @@ WHERE EVENT_TS >= DATEADD(day, -1, CURRENT_TIMESTAMP())
 ORDER BY EVENT_TS DESC;
 ```
 
-**Cuánto ha costado, por modelo**
+**Cuánto ha costado, por proveedor y modelo**
 
 ```sql
-SELECT MODEL,
+SELECT PROVIDER,
+       MODEL,
+       COST_UNIT,
        COUNT(*)              AS INVOCATIONS,
        SUM(TOTAL_TOKENS)     AS TOKENS,
-       ROUND(SUM(ESTIMATED_COST), 4) AS CREDITS,
+       ROUND(SUM(ESTIMATED_COST), 4) AS COST,
        ROUND(AVG(LATENCY_MS))        AS AVG_LATENCY_MS
 FROM CICD_DEMO.DEVOPS.V_AGENT_ACTIVITY
-GROUP BY MODEL;
+GROUP BY PROVIDER, MODEL, COST_UNIT;
 ```
 
-**Señal de calidad: porcentaje resuelto con consultas verificadas**
+**Señal de calidad: porcentaje resuelto con consultas verificadas** — hoy siempre `0%` hasta que se
+corrijan las `AI_VERIFIED_QUERIES` de la feature 002 (ver research.md D-06); no indica respuestas
+incorrectas.
 
 ```sql
 SELECT STATUS,

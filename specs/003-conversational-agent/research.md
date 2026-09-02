@@ -70,38 +70,47 @@ Tres razones, por orden de peso:
 
 **Alternativa considerada**: `openai-agents`, elegida en el documento de arquitectura del equipo.
 Es una opción defendible y **sigue siendo compatible con este diseño** — de hecho usa `openai` por
-debajo, con el mismo `base_url`, PAT y endpoint. Se descarta *ahora* porque su ventaja real
-(`Session` multi-turno, handoffs, guardrails) no se cobra en una feature que la constitución
-obliga a que sea *stateless* de un solo turno.
+debajo, con el mismo cliente y proveedor configurados en `llm_provider.py`. Se descarta *ahora*
+porque su ventaja real (`Session` multi-turno, handoffs, guardrails) no se cobra en una feature
+que la constitución obliga a que sea *stateless* de un solo turno.
 
-**Si se adopta más adelante**, la migración es local gracias a las tres reglas de diseño del
+**Si se adopta más adelante**, la migración es local gracias a las cuatro reglas de diseño del
 [plan](./plan.md#reglas-de-diseño-frontera-de-migración). Lo que cambiaría:
 
-- se conserva: `db.py`, `cortex_analyst.py`, la función de la tool, la tabla de telemetría y **los
-  tests de evaluación**;
+- se conserva: `db.py`, `cortex_analyst.py`, `llm_provider.py`, la función de la tool, la tabla de
+  telemetría y **los tests de evaluación**;
 - se reescribe: el bucle → `Runner.run()`, el cliente → `AsyncOpenAI` +
   `OpenAIChatCompletionsModel`, la instrumentación inline → `RunHooks`.
 
-Y haría falta obligatoriamente `set_tracing_disabled(True)`, porque el *tracing* integrado da 401
-sin clave de OpenAI.
+Y haría falta obligatoriamente `set_tracing_disabled(True)`, porque el *tracing* integrado sube
+trazas a `platform.openai.com` salvo que se desactive expresamente — esto aplica
+independientemente de qué proveedor de inferencia se use (D-11).
 
 ---
 
-## D-03 — Autenticación: el mismo PAT para los dos endpoints
+## D-03 — Autenticación: por proveedor, sin credenciales de más
 
-**Decisión**: `SNOWFLAKE_PAT` autentica las tres cosas: el conector de Snowflake, el endpoint de
-chat completions y el de Cortex Analyst. **No se introduce ninguna credencial nueva.**
+**Decisión**: la autenticación del orquestador depende de `LLM_PROVIDER` (ver D-11):
 
-- SDK de OpenAI: `OpenAI(api_key=SNOWFLAKE_PAT, base_url="https://<account>.snowflakecomputing.com/api/v2/cortex/v1")`
-- Cortex Analyst: cabeceras `Authorization: Bearer <PAT>` y
-  `X-Snowflake-Authorization-Token-Type: PROGRAMMATIC_ACCESS_TOKEN`
+- `LLM_PROVIDER=openai` (por defecto hoy): `OpenAI(api_key=OPENAI_API_KEY)` — la API pública de
+  OpenAI, `base_url` por defecto del SDK.
+- `LLM_PROVIDER=cortex` (cuando la cuenta lo permita): `OpenAI(api_key=SNOWFLAKE_PAT,
+  base_url="https://<account>.snowflakecomputing.com/api/v2/cortex/v1")` — sin credencial nueva.
 
-**Rationale**: Principio V pide el mínimo de secretos. Y `OPENAI_API_KEY` no sólo es innecesaria:
-su ausencia es una **garantía verificable** de que no se está llamando a la API pública de OpenAI.
-De ahí el test anti-fuga (D-08).
+Cortex Analyst se autentica **siempre** con `SNOWFLAKE_PAT`, sea cual sea `LLM_PROVIDER`:
+cabeceras `Authorization: Bearer <PAT>` y
+`X-Snowflake-Authorization-Token-Type: PROGRAMMATIC_ACCESS_TOKEN`.
 
-**Riesgo**: los PAT caducan. Un PAT expirado se manifiesta como `401` en los tres sitios a la vez;
-el mensaje de error del agente debe distinguirlo de "Cortex no responde" (FR-009).
+**Rationale**: Principio V pide el mínimo de secretos, no *cero* secretos — pedía cero mientras la
+Restricción Tecnológica prohibía la API pública (v1.0.0). Con la enmienda v2.0.0, `OPENAI_API_KEY`
+es un secreto legítimo y necesario mientras la cuenta Snowflake de la demo sea trial. El diseño
+sigue minimizando: Cortex Analyst nunca necesita una credencial nueva, y si mañana `LLM_PROVIDER`
+vuelve a `cortex`, `OPENAI_API_KEY` deja de leerse sin cambiar código.
+
+**Riesgo**: los PAT caducan. Un PAT expirado se manifiesta como `401` en Cortex Analyst y (si
+`LLM_PROVIDER=cortex`) también en el orquestador; el mensaje de error del agente debe distinguirlo
+de "el servicio no responde" (FR-009). Una `OPENAI_API_KEY` inválida da también `401`, pero sólo en
+el orquestador — permite diagnosticar cuál de los dos proveedores falla.
 
 ---
 
@@ -126,20 +135,23 @@ devuelve `403`.
 
 ---
 
-## D-05 — Modelo: configurable, con verificación de disponibilidad
+## D-05 — Modelo: por proveedor, configurable, con verificación de disponibilidad
 
-**Decisión**: variable de entorno `CORTEX_MODEL`, con un valor por defecto en el código. La
-elección concreta se **verifica empíricamente** en la primera tarea de implementación, contra dos
-requisitos: que el modelo esté disponible en la región de la cuenta y que soporte `tools`.
+**Decisión**: `OPENAI_MODEL` (cuando `LLM_PROVIDER=openai`) o `CORTEX_MODEL` (cuando
+`LLM_PROVIDER=cortex`), cada una con un valor por defecto en el código. La elección concreta se
+**verifica empíricamente** en la primera tarea de implementación: que el modelo esté disponible y
+que soporte `tools`.
 
-**Rationale**: no todos los modelos de Cortex soportan *function calling* (según la documentación,
-sí lo hacen las familias `openai-gpt-*` y Claude), y la disponibilidad depende de la región. Fijar
-un identificador de modelo en el plan sin haberlo probado es una vía directa a un `400` en
-implementación.
+**Rationale**: con `LLM_PROVIDER=openai` cualquier modelo de la familia GPT-4 en adelante soporta
+*function calling*; se fija un valor barato por defecto (p. ej. `gpt-4.1-mini`) y se deja
+configurable. Con `LLM_PROVIDER=cortex`, no todos los modelos de Cortex soportan *function
+calling* (según la documentación, sí las familias `openai-gpt-*` y Claude) y la disponibilidad
+depende de la región — verificado empíricamente el 2026-09-02 que, además, esta cuenta concreta no
+tiene ninguno habilitado (D-11).
 
-**Contingencia**: si el modelo elegido no está disponible en la región de `GNTUAOQ-YO01002`, se
-activa *cross-region inference* a nivel de cuenta. Es un cambio de parámetro de cuenta, no de
-código, y hay que documentarlo en `snowflake/manual/`.
+**Contingencia** (sólo aplica a `LLM_PROVIDER=cortex`): si el modelo elegido no está disponible en
+la región de `GNTUAOQ-YO01002`, se activa *cross-region inference* a nivel de cuenta. Es un cambio
+de parámetro de cuenta, no de código, y hay que documentarlo en `snowflake/manual/`.
 
 ---
 
@@ -165,8 +177,23 @@ Ninguna de las capas de la cadena da la foto completa por sí sola:
 
 El hallazgo aprovechable es **`verified_query_used`**: Cortex Analyst informa de si la pregunta se
 resolvió con una de las `AI_VERIFIED_QUERIES` definidas en la feature 002. Es una señal de calidad
-gratis, en runtime, sin LLM juez ni etiquetado manual, y da la métrica `% de preguntas resueltas
+gratis, en runtime, sin LLM juez ni etiquetado manual, y daría la métrica `% de preguntas resueltas
 por verified query`.
+
+**Limitación conocida (verificada empíricamente el 2026-09-02, no bloquea esta feature)**: las
+`AI_VERIFIED_QUERIES` de `SV_PHARMA_SALES` (feature 002) referencian nombres físicos de tabla.
+Cortex Analyst las descarta con un warning por cada una (*"Verified query 'Q01_...' referred to
+physical tables. The sql query was transformed to use logical table names"*) y genera él mismo el
+SQL correcto con nombres lógicos (`__sale`, `__product`, `__country`). Consecuencia:
+`verified_query_used` será **siempre `NULL`** hasta que se reescriban las verified queries de la
+002 — la columna `USED_VERIFIED_QUERY` y la métrica `PCT_VERIFIED` quedan en `0%` mientras tanto,
+sin que eso signifique que las respuestas sean incorrectas (Cortex Analyst genera SQL válido de
+todas formas, ver D-07). Se documenta aquí para que no se interprete como un bug de esta feature;
+la corrección pertenece a la feature 002 y queda fuera de alcance.
+
+**Nueva columna por la constitución v2.0.0**: `PROVIDER` (`openai` | `cortex`) y `COST_UNIT`
+(`USD` | `CREDITS`), porque el Principio IV exige declarar proveedor, modelo y unidad del coste.
+Ver [data-model.md](./data-model.md).
 
 **Alternativas consideradas**:
 
@@ -181,38 +208,50 @@ escriben van marcados con `writes_db` (marker ya existente en `pyproject.toml`).
 
 ---
 
-## D-07 — Los asserts de evaluación van sobre las filas, no sobre la prosa
+## D-07 — Los asserts de evaluación comparan contra un valor baseline exacto, no un umbral
 
 **Decisión**: `test_agent_evaluation.py` valida `AgentResponse.rows` (el resultado del SQL
-ejecutado) contra las aserciones del catálogo de referencia. El texto redactado por el modelo se
-comprueba sólo de forma débil: que no esté vacío y, en el caso de Q-12, que exprese ausencia de
-datos.
+ejecutado) comparando cada valor numérico contra el resultado de una **consulta baseline
+determinista** sobre las tablas base (`DIM_PRODUCT`, `DIM_COUNTRY`, `FACT_SALES`), no contra un
+umbral genérico como "`> 0`". El texto redactado por el modelo se comprueba sólo de forma débil:
+que no esté vacío y, en el caso de Q-12, que no contenga ninguna cifra de ventas.
 
-**Rationale**: el texto del modelo varía entre ejecuciones aunque la respuesta sea correcta.
-Aserciones sobre prosa producen tests intermitentes, y un test intermitente en un gate de CI acaba
-desactivado — que es justo lo que prohíbe el Flujo de Desarrollo de la constitución. Las filas del
-SQL son deterministas.
+**Rationale**: el Principio II (NON-NEGOTIABLE) exige preguntas de referencia "con su respuesta
+esperada". Un umbral como `total > 0` lo incumple en la práctica: un agente que alucine cualquier
+número positivo pasaría Q-01 igual. La corrección no cuesta nada de más: el SQL baseline por
+pregunta **ya existía** en `tests/test_reference_questions.py` (de la feature 001) para verificar el
+dataset; esta feature lo reutiliza como oro de referencia en vez de escribirlo de nuevo. Verificado
+empíricamente el 2026-09-02: para Q-01, Cortex Analyst devolvió `281521882.71` y el SQL baseline
+sobre tablas base da exactamente el mismo valor.
 
 **Alternativas consideradas**:
 
 - *LLM as a judge*: más fiel a la experiencia real, pero introduce no determinismo, coste por
   ejecución y un segundo modelo que explicar. Contra el Principio I.
 - `assert "4.200.000" in respuesta`: frágil ante formatos de número, redondeos e idioma.
+- `assert total is not None and total > 0` (descartada, era la versión inicial de este documento):
+  no cumple "con su respuesta esperada" del Principio II; un valor positivo cualquiera pasa el test
+  aunque sea erróneo.
 
 **Cómo se valida Q-12 entonces**: `status == NO_DATA` y `rows` vacío, más una comprobación de que
-la respuesta **no** contiene ninguna cifra inventada.
+la respuesta **no** contiene ninguna cifra de ventas — comprobando `rows == []`, no inspeccionando
+la prosa con una expresión regular (un año como "2023" en el texto no debe contar como cifra
+inventada).
 
 ---
 
-## D-08 — Test anti-fuga de `OPENAI_API_KEY`
+## D-08 — Test de coherencia de proveedor
 
-**Decisión**: un test que verifica que `OPENAI_API_KEY` no está en el entorno y que el agente
-funciona igualmente.
+**Decisión**: un test que verifica que el proveedor y el modelo efectivamente usados coinciden con
+`LLM_PROVIDER` y quedan reflejados en `PROVIDER`/`MODEL` de la telemetría, y que ninguna credencial
+del otro proveedor viaja por error (si `LLM_PROVIDER=cortex`, `OPENAI_API_KEY` no se lee aunque
+exista en el entorno; si `LLM_PROVIDER=openai`, `SNOWFLAKE_PAT` no se envía a `api.openai.com`).
 
-**Rationale**: la Restricción Tecnológica de la constitución ("NO se usa la API pública de OpenAI")
-es hoy una afirmación en un documento. Este test la convierte en un invariante ejecutable, y es lo
-único que impide que una futura línea de código empiece a llamar a `api.openai.com` sin que nadie
-se entere. Cuesta dos líneas.
+**Rationale**: con la constitución v1.0.0 este test verificaba la ausencia de `OPENAI_API_KEY` como
+invariante — la enmienda v2.0.0 invierte esa premisa: hoy `OPENAI_API_KEY` **sí** se usa por
+defecto. Lo que hay que garantizar ya no es "nunca se llama a OpenAI", sino "se llama exactamente
+al proveedor configurado, y de forma transparente en la telemetría" — que sigue siendo un
+invariante barato de comprobar y sigue impidiendo una fuga de credenciales entre proveedores.
 
 ---
 
@@ -244,3 +283,41 @@ esta feature.
 
 **Alternativas consideradas**: endpoint HTTP (añade framework web sin aportar a la demo);
 Streamlit in Snowflake (interesante para el futuro, pero es despliegue de app, otra feature).
+
+---
+
+## D-11 — Proveedor del orquestador: OpenAI público por defecto, Cortex como alternativa configurable
+
+**Decisión**: variable de entorno `LLM_PROVIDER` (`openai` por defecto, `cortex` como alternativa),
+consumida por una única función `build_llm_client()` en `llm_provider.py` que devuelve el cliente
+`openai.OpenAI` ya configurado (API key, `base_url`, modelo por defecto) según el valor.
+
+**Rationale — por qué esto no estaba en el plan original**: la constitución v1.0.0 obligaba a usar
+únicamente el endpoint de Cortex. Verificación empírica el 2026-09-02 contra la cuenta real
+(`GNTUAOQ-YO01002`, trial, región `AWS_EU_WEST_3`) mostró que **ninguna vía de inferencia LLM de
+Cortex está habilitada**:
+
+| Vía probada | Resultado |
+|---|---|
+| `SNOWFLAKE.CORTEX.COMPLETE(...)` por SQL, 2 modelos | `399258 (0A000): AI function COMPLETE is not available for trial accounts` |
+| `POST /api/v2/cortex/inference:complete` | `403 003001: This account is not allowed to access this endpoint` |
+| `POST /api/v2/cortex/v1/chat/completions`, 6 modelos | `403 003001`, idéntico en los seis |
+
+No es un problema de grants (`SNOWFLAKE.CORTEX_USER` ya concedido) ni de rol por defecto: es una
+entitlement de cuenta. La constitución se enmendó a **v2.0.0** para permitir la API pública de
+OpenAI como salida (ver Sync Impact Report en
+[constitution.md](../../.specify/memory/constitution.md)). Cortex Analyst, que sí funciona en esta
+cuenta (verificado: HTTP 200, SQL válido, `request_id`), se mantiene como único traductor NL→SQL.
+
+**Por qué es configurable y no un cambio directo de `agent.py` a OpenAI**: la limitación es de la
+*cuenta*, no del *diseño*. Si mañana se pasa a una cuenta de Snowflake de pago con Cortex habilitado,
+la arquitectura correcta vuelve a ser "todo dentro de Snowflake" (más alineada con Principio I y el
+mensaje pedagógico del repo). Fijar `agent.py` a OpenAI público sin capa de configuración
+convertiría ese cambio futuro en una reescritura; con `LLM_PROVIDER`, es una variable de entorno.
+
+**Coste de la abstracción**: una función y un `if`/`else` en `llm_provider.py` (~15 líneas). No
+introduce un patrón *strategy* con clases ni un registro de proveedores — eso sería
+sobre-ingeniería para dos casos (Principio I).
+
+**Consecuencias documentadas en otras decisiones**: D-03 (autenticación), D-05 (modelo), D-06
+(columnas `PROVIDER`/`COST_UNIT` en telemetría), D-08 (test de coherencia en vez de anti-fuga).

@@ -45,6 +45,7 @@ class AgentStatus(str, Enum):
 class TokenUsage:
     prompt_tokens: int
     completion_tokens: int
+    provider: str
     model: str
 
 
@@ -136,22 +137,25 @@ Fuente de verdad de las preguntas:
 [reference-questions.md](../../001-mock-sales-dataset/contracts/reference-questions.md).
 Esta feature **no añade preguntas nuevas**.
 
-Los asserts van sobre `AgentResponse.rows`, no sobre `answer` (decisión D-07).
+Los asserts van sobre `AgentResponse.rows`, comparando **contra el valor exacto de la consulta
+baseline determinista** ya existente en `tests/test_reference_questions.py` (feature 001), no un
+umbral débil ni la prosa de `answer` (decisión D-07 revisada — resuelve el hallazgo de que "un
+número positivo cualquiera" pasaba el test).
 
 | # | `status` esperado | Assert sobre `rows` | Assert sobre `answer` |
 |---|---|---|---|
-| Q-01 | `OK` | 1 fila, valor numérico `> 0` | no vacía |
-| Q-02 | `OK` | 1 fila, entero `> 0` | no vacía |
-| Q-03 | `OK` | 5 filas, valores distintos, orden descendente | no vacía |
-| Q-04 | `OK` | 2 filas, ambas `> 0` | no vacía |
-| Q-05 | `OK` | ≥ 1 fila, variación no nula | no vacía |
-| Q-06 | `OK` | 12 filas, una por mes, sin huecos | no vacía |
-| Q-07 | `OK` | ≥ 1 fila, ratio entre 0 y 0.40 | no vacía |
-| Q-08 | `OK` | 4 filas, todas `> 0` | no vacía |
-| Q-09 | `OK` | ≥ 1 fila, entero `> 0` | no vacía |
-| Q-10 | `OK` | 1 fila, valor `> 0` | no vacía |
-| Q-11 | `OK` | 12 filas, todas `> 0` | no vacía |
-| Q-12 | `NO_DATA` | vacía | contiene expresión de ausencia de datos y **ninguna cifra de ventas** |
+| Q-01 | `OK` | 1 fila, valor == baseline (ventas netas 2025) | no vacía |
+| Q-02 | `OK` | 1 fila, valor == baseline (unidades Respiralia Alemania 2024) | no vacía |
+| Q-03 | `OK` | 5 filas == top-5 baseline, mismo orden descendente | no vacía |
+| Q-04 | `OK` | 2 filas, valores == baseline por unidad de negocio | no vacía |
+| Q-05 | `OK` | filas == baseline (área terapéutica de mayor crecimiento) | no vacía |
+| Q-06 | `OK` | 12 filas, una por mes, cada valor == baseline mensual | no vacía |
+| Q-07 | `OK` | filas == baseline (ratio descuento/bruto) | no vacía |
+| Q-08 | `OK` | 4 filas, valores == baseline por región | no vacía |
+| Q-09 | `OK` | filas == baseline (unidades por canal) | no vacía |
+| Q-10 | `OK` | 1 fila, valor == baseline | no vacía |
+| Q-11 | `OK` | 12 filas == baseline mensual, todas presentes | no vacía |
+| Q-12 | `NO_DATA` | vacía | contiene expresión de ausencia de datos; `rows == []` es la comprobación real de "sin cifra inventada" (no un regex sobre el texto) |
 
 Asserts transversales, aplicables a todos los casos:
 
@@ -159,7 +163,8 @@ Asserts transversales, aplicables a todos los casos:
 - ningún valor numérico es `NaN` ni `None`;
 - si `status == OK`, entonces `sql is not None` y el SQL es ejecutable (lo demuestra el hecho de
   que hay filas);
-- `usage.prompt_tokens > 0` y `latency_ms > 0`.
+- `usage.prompt_tokens > 0` y `latency_ms > 0`;
+- `usage.provider` coincide con `LLM_PROVIDER` configurado en el entorno de test.
 
 ## Tests de contrato
 
@@ -167,7 +172,7 @@ Asserts transversales, aplicables a todos los casos:
 
 | Test | Qué verifica | Requisito |
 |---|---|---|
-| `test_no_openai_api_key_needed` | `OPENAI_API_KEY` no está en el entorno y `ask()` funciona igual | D-08, Restricción Tecnológica |
+| `test_provider_matches_config` | El proveedor y modelo usados coinciden con `LLM_PROVIDER`, y no viaja al proveedor equivocado la credencial del otro (D-08) | FR-003, Restricción Tecnológica |
 | `test_ask_is_stateless` | Dos `ask()` seguidos: el segundo no resuelve una referencia al primero | FR-006 |
 | `test_out_of_domain_question` | "¿Qué tiempo hace hoy?" → `NO_DATA`, no `ERROR` ni cifra inventada | Edge case, SC-002 |
 | `test_analyst_timeout_returns_error` | Con timeout forzado a 0 → `status == ERROR` y mensaje de fallo de servicio | FR-009 |
@@ -179,11 +184,11 @@ Asserts transversales, aplicables a todos los casos:
 |---|---|
 | FR-001 | `ask()` + CLI |
 | FR-002 | `test_no_direct_table_access` |
-| FR-003 | `test_no_openai_api_key_needed` + `base_url` de Cortex |
-| FR-004 | Q-01..Q-11 de la suite de evaluación |
+| FR-003 | `test_provider_matches_config` + `llm_provider.build_llm_client()` |
+| FR-004 | Q-01..Q-11 de la suite de evaluación, contra baseline exacto |
 | FR-005 | Q-12 + `test_out_of_domain_question` |
 | FR-006 | `test_ask_is_stateless` |
 | FR-007 | `test_telemetry.py` |
-| FR-008 | Reutilización de `db.py`; sin credenciales nuevas |
+| FR-008 | Reutilización de `db.py`; credenciales por proveedor vía `llm_provider.py` |
 | FR-009 | `test_analyst_timeout_returns_error` |
 | FR-010 | Orden de tareas en `tasks.md` |

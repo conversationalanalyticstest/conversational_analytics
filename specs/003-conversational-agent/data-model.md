@@ -68,7 +68,8 @@ Reglas:
 |---|---|---|
 | `prompt_tokens` | `int` | `usage.prompt_tokens` de la respuesta de chat completions |
 | `completion_tokens` | `int` | `usage.completion_tokens` |
-| `model` | `str` | valor efectivo de `CORTEX_MODEL` |
+| `provider` | `str` | valor efectivo de `LLM_PROVIDER` (`openai` \| `cortex`) |
+| `model` | `str` | valor efectivo de `OPENAI_MODEL` o `CORTEX_MODEL`, según `provider` |
 
 Se acumula a lo largo de **todas** las llamadas al modelo de una misma invocación (el bucle de
 tool-calling hace al menos dos), no sólo de la última. Registrar sólo la última infravaloraría el
@@ -94,10 +95,12 @@ Una fila por invocación de `ask()`. DDL completo en
 | `ANALYST_REQUEST_ID` | `STRING` | no | `request_id` de Cortex Analyst | trazabilidad |
 | `SF_QUERY_ID` | `STRING` | no | `cursor.sfqid` | trazabilidad |
 | `ROW_COUNT` | `NUMBER` | no | `len(rows)` | — |
-| `MODEL` | `STRING` | sí | `CORTEX_MODEL` efectivo | — |
+| `PROVIDER` | `STRING` | sí | `LLM_PROVIDER` efectivo (`openai` \| `cortex`) | proveedor |
+| `MODEL` | `STRING` | sí | `TokenUsage.model` efectivo | — |
 | `PROMPT_TOKENS` | `NUMBER` | sí | `TokenUsage.prompt_tokens` | tokens entrada |
 | `COMPLETION_TOKENS` | `NUMBER` | sí | `TokenUsage.completion_tokens` | tokens salida |
-| `ESTIMATED_COST` | `FLOAT` | sí | calculado (ver abajo) | coste estimado |
+| `ESTIMATED_COST` | `FLOAT` | no | calculado (ver abajo) | coste estimado |
+| `COST_UNIT` | `STRING` | sí | `'USD'` si `PROVIDER='openai'`, `'CREDITS'` si `PROVIDER='cortex'` | unidad del coste |
 | `LATENCY_MS` | `NUMBER` | sí | cronómetro alrededor de `ask()` | latencia |
 | `STATUS` | `STRING` | sí | `AgentStatus` | estado |
 | `ERROR_MESSAGE` | `STRING` | no | `AgentResponse.error_message` | estado |
@@ -111,6 +114,8 @@ Una fila por invocación de `ask()`. DDL completo en
 - `ROW_COUNT > 0` ⟹ `STATUS = 'OK'`.
 - `GENERATED_SQL IS NULL` ⟹ `STATUS ≠ 'OK'`.
 - `FEEDBACK ∈ {-1, 1, NULL}`.
+- `PROVIDER ∈ {'openai','cortex'}` y `COST_UNIT` es coherente con `PROVIDER` (`'USD'` ⟺ `'openai'`,
+  `'CREDITS'` ⟺ `'cortex'`).
 
 **Sin claves foráneas.** Es una tabla de eventos, append-only; no se actualiza salvo la columna
 `FEEDBACK`.
@@ -118,17 +123,19 @@ Una fila por invocación de `ask()`. DDL completo en
 ### Cálculo de `ESTIMATED_COST`
 
 Se calcula en Python, no en SQL, y se guarda ya resuelto en la fila. Motivo: el precio depende del
-modelo, y guardar el coste congelado al momento de la invocación evita que un cambio futuro de
-tarifas reescriba la historia.
+modelo y del proveedor, y guardar el coste congelado al momento de la invocación evita que un
+cambio futuro de tarifas reescriba la historia.
 
 ```text
-ESTIMATED_COST = (PROMPT_TOKENS + COMPLETION_TOKENS) / 1_000_000 * CREDITS_PER_MTOKEN[MODEL]
+ESTIMATED_COST = (PROMPT_TOKENS + COMPLETION_TOKENS) / 1_000_000 * PRICE_PER_MTOKEN[PROVIDER][MODEL]
 ```
 
-`CREDITS_PER_MTOKEN` es una constante en `telemetry.py`, en **créditos de Snowflake** (no en euros:
-el precio del crédito depende del contrato). Si el modelo no está en el diccionario, se registra
-`NULL` en vez de fallar la invocación — una tarifa desconocida no puede tumbar una respuesta
-correcta.
+`PRICE_PER_MTOKEN` es una constante en `telemetry.py`, con dos tablas de tarifas separadas: una en
+**USD** (precios públicos de OpenAI por modelo) y otra en **créditos de Snowflake** (para cuando
+`LLM_PROVIDER=cortex`; el precio del crédito en euros depende del contrato). `COST_UNIT` deja
+explícito con cuál se calculó cada fila, para que no se sumen valores en unidades distintas por
+error. Si el modelo no está en la tabla correspondiente, se registra `NULL` en vez de fallar la
+invocación — una tarifa desconocida no puede tumbar una respuesta correcta.
 
 ### Vista `V_AGENT_ACTIVITY`
 
@@ -138,12 +145,13 @@ Responde a las tres preguntas que exige el Principio IV. Definición en
 | Pregunta del Principio IV | Columnas que la responden |
 |---|---|
 | ¿Qué se ha preguntado? | `EVENT_TS`, `ACTOR`, `QUESTION`, `ANSWER` |
-| ¿Cuánto ha costado? | `PROMPT_TOKENS`, `COMPLETION_TOKENS`, `ESTIMATED_COST`, `LATENCY_MS` |
+| ¿Cuánto ha costado? | `PROVIDER`, `MODEL`, `PROMPT_TOKENS`, `COMPLETION_TOKENS`, `ESTIMATED_COST`, `COST_UNIT`, `LATENCY_MS` |
 | ¿Fue correcta la respuesta? | `STATUS`, `USED_VERIFIED_QUERY`, `FEEDBACK` |
 
 Donde `USED_VERIFIED_QUERY := VERIFIED_QUERY_NAME IS NOT NULL`. Es un *proxy* de calidad, no una
 prueba: significa que Cortex Analyst resolvió la pregunta con una de las consultas verificadas de
-la feature 002, que están validadas contra el catálogo de referencia.
+la feature 002. **Hoy siempre es `FALSE`** por un defecto conocido de esas verified queries (ver
+research.md D-06); no indica que las respuestas sean incorrectas.
 
 ## Trazabilidad con la spec
 
