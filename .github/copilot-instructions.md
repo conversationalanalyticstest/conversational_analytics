@@ -5,8 +5,10 @@ Responde siempre en **español**.
 ## Contexto
 
 Demo pedagógica de **CI/CD sobre Snowflake con Git**. Un agente conversacional consulta tablas
-de Snowflake vía *semantic views*, usando Cortex a través del **SDK de OpenAI apuntando al
-endpoint de Cortex** (NO la API pública de OpenAI). Equipo de 2-5 personas.
+de Snowflake vía *semantic views*. **Cortex Analyst** traduce lenguaje natural a SQL (pieza
+obligatoria, no negociable); la orquestación y la redacción de la respuesta final usan el
+**SDK de OpenAI**, apuntable a la API pública de OpenAI o al endpoint de Cortex según lo que la
+cuenta tenga habilitado (ver constitución v2.0.0). Equipo de 2-5 personas.
 
 La [constitución del proyecto](../.specify/memory/constitution.md) es **vinculante**. Léela antes
 de planificar o implementar y señala cualquier conflicto en vez de resolverlo por tu cuenta.
