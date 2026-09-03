@@ -405,3 +405,31 @@ Con varias personas:
 - Parar en cualquier checkpoint para validar una historia de forma independiente.
 - Evitar: tareas vagas, conflictos de mismo fichero sin necesidad, dependencias cruzadas entre
   historias que rompan su independencia.
+
+---
+
+## Phase 9: Convergence
+
+**Purpose**: cerrar dos huecos detectados por `speckit-converge` entre lo que documenta el
+diseño (`research.md` D-09, `contracts/workflows.md`) y lo que implementan de verdad
+`deploy.yml`/`revert.yml`: el Issue de *drift* no incluye el motivo del último despliegue, y no
+se distingue como incidente cuando el propio rollback automático falla.
+
+- [ ] T038 [P] Extender `tests/test_ops_drift.py` con un caso para la nueva salida `reason` de
+      `ops/drift.py`, y añadir en `tests/test_ops_deploy.py` un test (marcado
+      `@pytest.mark.writes_db`) para una función nueva en `ops/deployments_log.py` que devuelva
+      el `REASON` de la fila más reciente de `DEPLOYMENTS`. Debe **fallar** antes de T039.
+- [ ] T039 Implementar en `src/conversational_analytics/ops/deployments_log.py` una función
+      (p. ej. `latest_row()`) que devuelva `ACTION`/`REASON`/`TARGET_COMMIT_SHA` de la fila más
+      reciente de `DEPLOYMENTS`, y extender `src/conversational_analytics/ops/drift.py` para
+      exponer ese motivo como salida `reason` en `$GITHUB_OUTPUT` (hace pasar T038; depende de
+      T038) per D-09 (research.md) (partial).
+- [ ] T040 Actualizar el paso de crear/actualizar el Issue de *drift* en
+      `.github/workflows/deploy.yml` y `.github/workflows/revert.yml` para incluir en el cuerpo
+      el motivo (`reason`) resuelto en T039, tal como especifica D-09 (depende de T039) per D-09
+      (partial).
+- [ ] T041 Marcar explícitamente el Issue de *drift* como incidente (texto adicional en el
+      título/cuerpo, p. ej. "🚨 INCIDENTE: revisar manualmente") cuando el paso de rollback
+      automático de `.github/workflows/deploy.yml` falla, en vez de reutilizar el mismo mensaje
+      genérico de *drift* rutinario, per contracts/workflows.md (paso 8 de `deploy.yml`) / FR-011
+      (partial).
