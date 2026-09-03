@@ -1,29 +1,29 @@
 <!--
 SYNC IMPACT REPORT
-Version change: 1.0.0 → 2.0.0
-Bump rationale: MAJOR. Se revierte una prohibición explícita: la v1.0.0 declaraba
-"NO se usa la API pública de OpenAI". La v2.0.0 la permite para la capa de
-orquestación. Es una redefinición incompatible hacia atrás de una restricción
-tecnológica vinculante, no una aclaración.
+Version change: 2.0.0 → 3.0.0
+Bump rationale: MAJOR. Se retira el paso "pre-commit local" de la cadena de CI/CD
+que el Principio III declaraba MUST mantener operativa, y se elimina la mención
+a `pre-commit` como herramienta de calidad obligatoria. Es la retirada de una
+obligación normativa ya vinculante (no una aclaración ni una ampliación), de ahí
+el MAJOR.
 
-Causa: verificación empírica contra la cuenta Snowflake del proyecto (2026-09-02).
-La cuenta es de tipo trial y NO tiene habilitada la inferencia LLM de Cortex por
-ninguna vía: `SNOWFLAKE.CORTEX.COMPLETE` falla con 399258 ("not available for
-trial accounts") y los endpoints REST `/api/v2/cortex/inference:complete` y
-`/api/v2/cortex/v1/chat/completions` devuelven 403 003001. La restricción de la
-v1.0.0 era, por tanto, imposible de cumplir. Cortex Analyst
-(`/api/v2/cortex/analyst/message`) sí funciona y se conserva como pieza obligatoria.
+Causa: al diseñar la feature 004-ci-cd-pipeline (speckit-analyze), se detectó que
+ninguna spec/plan/tasks del proyecto implementaba el paso de pre-commit, y que
+añadirlo no había sido pedido por el equipo. Se decide formalmente no exigirlo a
+nivel de constitución en esta fase del proyecto, en vez de mantener una regla
+MUST incumplida de forma permanente.
 
 Principios modificados:
-  - IV. Observabilidad y Control de Coste — ampliado: el registro MUST incluir
-    proveedor y modelo, y el coste MUST indicar su unidad (créditos o USD).
+  - III. CI/CD Es el Producto — la cadena obligatoria pasa de 5 a 4 pasos (se
+    retira "1. pre-commit local"); los pasos restantes se renumeran.
 
-Principios sin cambios: I, II, III, V.
+Principios sin cambios: I, II, IV, V.
 
 Secciones modificadas:
-  - Restricciones Tecnológicas — la viñeta "Modelo" se reescribe separando
-    traducción NL→SQL (Cortex Analyst, obligatorio) de orquestación (SDK de
-    OpenAI, proveedor configurable). Se añade la viñeta "Salida de datos".
+  - Restricciones Tecnológicas — la viñeta "Calidad" ya no exige `pre-commit`.
+  - Flujo de Desarrollo — el ciclo obligatorio pasa de 6 a 5 pasos (se retira el
+    paso de pre-commit local); se ajusta la regla de gate sobre `--no-verify`
+    (ya no aplica: no hay hook local que saltarse).
 
 Secciones añadidas: ninguna. Secciones eliminadas: ninguna.
 
@@ -74,11 +74,10 @@ los números es el requisito de negocio, no un extra.
 El pipeline no es infraestructura auxiliar: es exactamente lo que este proyecto demuestra.
 MUST existir y mantenerse operativa la cadena completa:
 
-1. **pre-commit local** → lint, formato y evaluación rápida del agente.
-2. **Pull Request** → suite completa de tests contra Snowflake.
-3. **Merge a `main`** → despliegue automático a Snowflake.
-4. **Post-deploy** → re-ejecución de la evaluación contra el entorno ya desplegado.
-5. **Fallo post-deploy** → rollback automático a la última versión buena conocida.
+1. **Pull Request** → suite completa de tests contra Snowflake.
+2. **Merge a `main`** → despliegue automático a Snowflake.
+3. **Post-deploy** → re-ejecución de la evaluación contra el entorno ya desplegado.
+4. **Fallo post-deploy** → rollback automático a la última versión buena conocida.
 
 - Todo artefacto desplegable (prompts del sistema, semantic views, configuración del agente)
   MUST vivir en Git. Ningún cambio se aplica a mano en la consola de Snowflake.
@@ -145,7 +144,7 @@ demo que solo funciona en un portátil concreto no se puede enseñar.
 - **Agente**: el framework queda a elección, priorizando el más simple de explicar. La versión
   inicial es un agente de un solo turno sin contexto previo.
 - **CI/CD**: GitHub Actions.
-- **Calidad**: pre-commit con linter y formateador; `pytest` como runner de tests.
+- **Calidad**: `pytest` como runner de tests.
 
 Introducir cualquier tecnología fuera de esta lista MUST documentarse y justificarse en el plan
 de la feature correspondiente.
@@ -155,16 +154,15 @@ de la feature correspondiente.
 **Ciclo obligatorio para todo cambio:**
 
 1. Rama creada desde `main`.
-2. `pre-commit` en local: lint, formato y evaluación rápida del agente. Bloquea el commit si falla.
-3. Pull Request: GitHub Actions ejecuta la suite completa de tests contra Snowflake.
-4. Revisión: MUST haber al menos una aprobación de otro miembro del equipo antes del merge.
-5. Merge a `main`: dispara el despliegue a Snowflake y la re-ejecución de la evaluación post-deploy.
-6. Si la evaluación post-deploy falla: rollback automático y notificación al equipo.
+2. Pull Request: GitHub Actions ejecuta la suite completa de tests contra Snowflake.
+3. Revisión: MUST haber al menos una aprobación de otro miembro del equipo antes del merge.
+4. Merge a `main`: dispara el despliegue a Snowflake y la re-ejecución de la evaluación post-deploy.
+5. Si la evaluación post-deploy falla: rollback automático y notificación al equipo.
 
 **Reglas de gate:**
 
 - `main` MUST estar siempre en estado desplegable.
-- MUST NOT usarse `--no-verify` ni saltarse checks de CI para acelerar un merge.
+- MUST NOT saltarse checks de CI para acelerar un merge.
 - Un cambio en un prompt del sistema es un cambio de producción y recorre el ciclo completo,
   igual que un cambio de código.
 - Los tests que fallan se arreglan; no se desactivan ni se marcan como *skip* sin una issue
@@ -189,4 +187,4 @@ repositorio.
 - Los artefactos de `specs/` (spec, plan, tasks) son la guía operativa en tiempo de ejecución y
   MUST ser coherentes con este documento.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-31 | **Last Amended**: 2026-09-02
+**Version**: 3.0.0 | **Ratified**: 2026-08-31 | **Last Amended**: 2026-09-03
