@@ -286,7 +286,8 @@ historial y reactivar la anterior sin ejecutar ningún comando de Git (ver Escen
 - **US3 (Phase 5)**: depende de Foundational y de T019 (modo release completa de US2), porque
   "re-desplegar la última release buena" reutiliza esa misma lógica.
 - **US4 (Phase 6)**: depende de Foundational y de T019, igual que US3; no depende de US3.
-- **US5 (Phase 7)**: depende de Foundational (T012); no depende de US1-US4.
+- **US5 (Phase 7)**: depende de Foundational (T012) para T031/T032; T033 depende además de T019
+  (US2), porque modifica el mismo `ops/deploy.py`.
 - **Polish (Phase 8)**: depende de que todas las historias deseadas estén completas.
 
 ### User Story Dependencies
@@ -297,7 +298,7 @@ historial y reactivar la anterior sin ejecutar ningún comando de Git (ver Escen
   comportamiento y en test.
 - **US3 (P2)**: Foundational + T019 (US2).
 - **US4 (P2)**: Foundational + T019 (US2); no depende de US3.
-- **US5 (P3)**: Foundational (T012) únicamente.
+- **US5 (P3)**: Foundational (T012) para T031/T032; T033 depende además de T019 (US2).
 
 ### Within Each User Story
 
@@ -311,8 +312,10 @@ historial y reactivar la anterior sin ejecutar ningún comando de Git (ver Escen
 - Todas las tareas `[P]` de Setup y Foundational pueden hacerse en paralelo entre sí.
 - T007, T008, T009 (tests de Foundational) son paralelos entre sí (ficheros distintos).
 - Una vez completada Foundational, **US1 y US5 pueden trabajarse en paralelo** por personas
-  distintas (no comparten ficheros de implementación). US2 debe esperar a que T014 (US1) exista
-  si se quiere evitar tocar `ops/deploy.py` a la vez desde dos ramas de trabajo distintas.
+  distintas para sus tareas iniciales (T014-T016 de US1 no comparten fichero con T031/T032 de
+  US5). US2 debe esperar a que T014 (US1) exista si se quiere evitar tocar `ops/deploy.py` a la
+  vez desde dos ramas de trabajo distintas. T033 (US5) además debe esperar a T019 (US2), por lo
+  que la persona en US5 solo puede cerrar su fase por completo después de que US2 esté lista.
 - US3 y US4 pueden trabajarse en paralelo una vez que T019 (US2) está listo.
 
 ---
@@ -360,10 +363,12 @@ Con varias personas:
 1. El equipo completa junto Setup + Foundational (es compartido por todas las historias).
 2. Una vez lista Foundational:
    - Persona A: US1 (pr-checks.yml)
-   - Persona B: US5 (retención de semantic views) — no depende de US1
+   - Persona B: US5, solo T031/T032 (retención) — no dependen de US1. T033 debe esperar a que
+     Persona A (o quien lo haga) complete T019 de US2.
 3. Cuando T019 (release completa) está lista:
    - Persona A continúa con US2 (deploy.yml)
-   - Persona B pasa a US3 o US4 (rollback/revert), en paralelo entre sí
+   - Persona B cierra US5 con T033 y luego pasa a US3 o US4 (rollback/revert), en paralelo entre
+     sí
 
 ---
 
@@ -371,8 +376,9 @@ Con varias personas:
 
 - `[P]` = ficheros distintos, sin dependencias pendientes.
 - `[Story]` mapea cada tarea a su historia de usuario para trazabilidad.
-- `ops/deploy.py` es el único fichero compartido entre US1 y US2 (dos modos de la misma CLI); el
-  resto de ficheros son exclusivos de una historia.
+- `ops/deploy.py` es el fichero compartido entre **US1, US2 y US5** (tres modos/usos de la misma
+  CLI: `--candidate` en US1, release completa en US2, invocación de retención al final de la
+  release completa en US5/T033); el resto de ficheros son exclusivos de una historia.
 - Verificar que los tests fallan antes de implementar.
 - Commitear tras cada tarea o grupo lógico de tareas.
 - Parar en cualquier checkpoint para validar una historia de forma independiente.

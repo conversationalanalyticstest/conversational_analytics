@@ -80,9 +80,10 @@ drift en <1 min tras consultarlo (SC-008).
   `cancel-in-progress: false` sobre un grupo único de despliegue.
 - El revert y el rollback automático MUST NOT usar `git reset`, `git push --force` ni reescribir
   el historial de `main` (FR-016, y restricción general de la spec).
-- Pre-commit local (paso 1 del Principio III) queda **fuera de alcance** de esta feature: no
-  existe todavía `.pre-commit-config.yaml` en el repo y añadirlo es una decisión independiente,
-  no pedida explícitamente. Se documenta como assumption.
+- Pre-commit local queda **fuera de alcance** de esta feature: la constitución (enmienda
+  v3.0.0) ya no lo exige como parte de la cadena de CI/CD; no existe `.pre-commit-config.yaml`
+  en el repo y añadirlo, si se quiere en el futuro, es una decisión independiente de esta
+  feature.
 
 **Scale/Scope**: 3 workflows, 1 subpaquete Python (~5 módulos), 2 tablas nuevas + 1 tabla de
 configuración, 4 ficheros de test nuevos, 1 cambio pequeño en `cortex_analyst.py`.
@@ -114,9 +115,9 @@ correspondiente (se fijará el orden en `tasks.md`).
 
 ### Principio III — CI/CD Es el Producto
 
-**PASA — es el objeto mismo de esta feature.** Cubre explícitamente los 5 pasos de la cadena que
-la constitución exige: pre-commit local queda fuera de alcance (ver Constraints); PR (paso 2),
-merge→despliegue (paso 3), post-deploy (paso 4) y rollback automático (paso 5) quedan cubiertos
+**PASA — es el objeto mismo de esta feature.** Cubre explícitamente los 4 pasos de la cadena que
+la constitución exige (enmienda v3.0.0, sin pre-commit local): PR (paso 1),
+merge→despliegue (paso 2), post-deploy (paso 3) y rollback automático (paso 4) quedan cubiertos
 por `pr-checks.yml` y `deploy.yml`. Todo artefacto desplegable (SQL, semantic view, código del
 agente) sigue viviendo en Git; nada se aplica a mano. Cada despliegue queda identificado por
 commit SHA (`DEPLOYMENTS.TARGET_COMMIT_SHA`) y el rollback es un mecanismo **probado**, no solo
