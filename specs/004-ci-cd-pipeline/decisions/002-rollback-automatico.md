@@ -112,6 +112,26 @@ Se mantiene por duplicado, con propósitos distintos:
 
 El tag es el puntero operativo que usa el rollback; el registro es la auditoría.
 
+### Cómo se sabe qué está desplegado (y que no es el HEAD de `main`)
+
+Tras un rollback, `main` y Snowflake divergen deliberadamente. El estado real se determina por
+tres vías independientes, ninguna de las cuales exige abrir los logs del pipeline:
+
+| Fuente | Qué responde | Cómo se consulta |
+|---|---|---|
+| Tag `deployed-good` | Qué SHA está desplegado y qué commits de `main` no lo están | `git rev-parse deployed-good` frente a `origin/main`; `git log deployed-good..origin/main` |
+| Registro `DEPLOYMENTS` en Snowflake | Histórico de acciones (deploy / auto_rollback / manual_revert), con quién y cuándo | Consulta SQL |
+| `AGENT_TELEMETRY.COMMIT_SHA` | Qué versión está atendiendo peticiones reales ahora mismo | Consulta SQL sobre la telemetría de la feature 003 |
+
+Las dos primeras registran la *intención* del pipeline; la tercera aporta evidencia de *hechos*, y
+sirve para detectar una discrepancia entre lo que el pipeline cree haber desplegado y lo que
+realmente responde.
+
+Como las tres exigen ir a mirar, FR-021 y FR-022 añaden una señal proactiva: el drift se anuncia
+al producirse, y un despliegue lanzado con drift sin resolver advierte antes de aplicar cambios.
+Esto evita el fallo más probable del *forward-fix*: fusionar otra PR tras un rollback y volver a
+desplegar en silencio el commit que causó el fallo.
+
 ### Alcance del rollback
 
 El rollback actúa sobre la **release completa** (agente + semantic view conjuntamente), coherente

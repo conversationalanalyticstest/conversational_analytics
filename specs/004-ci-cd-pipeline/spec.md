@@ -161,6 +161,9 @@ anterior sin ejecutar ningún comando de Git.
   entorno de Snowflake.
 - ¿Qué pasa si el rollback automático (User Story 3) también falla? El sistema MUST detenerse,
   notificar como incidente y no dejar reintentos automáticos indefinidos.
+- ¿Qué pasa si, tras un rollback, alguien fusiona otra PR sin haber corregido la causa del fallo?
+  El sistema MUST advertir de la situación de *drift* antes de desplegar, en vez de volver a
+  aplicar en silencio la versión problemática.
 - ¿Qué pasa si se pide un revert manual (User Story 4) y todavía no existe ninguna release previa
   desplegada (primer despliegue del proyecto)? El sistema MUST rechazar la acción con un mensaje
   claro.
@@ -221,6 +224,12 @@ anterior sin ejecutar ningún comando de Git.
   artefactos en versiones incompatibles entre sí.
 - **FR-020**: MUST existir una política documentada de retención de versiones antiguas de
   semantic views, de modo que su acumulación en Snowflake esté acotada.
+- **FR-021**: Tras un rollback automático o un revert manual, el sistema MUST señalar de forma
+  visible y proactiva que `main` contiene commits no desplegados (*drift*), sin que nadie tenga
+  que consultar los logs del pipeline para descubrirlo.
+- **FR-022**: Si se dispara un despliegue mientras existe una situación de *drift* sin resolver,
+  el sistema MUST advertirlo explícitamente antes de aplicar los cambios, para evitar
+  redesplegar en silencio la versión que causó el fallo.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -254,6 +263,8 @@ anterior sin ejecutar ningún comando de Git.
   del equipo (no una secuencia de pasos manuales) y se completa en menos de 5 minutos.
 - **SC-005**: Cualquier miembro del equipo puede identificar qué commit SHA está desplegado
   actualmente en Snowflake sin necesidad de revisar logs de ejecución del pipeline.
+- **SC-008**: Tras un rollback o revert, cualquier miembro del equipo puede determinar en menos de
+  un minuto qué commits están en `main` pero no desplegados.
 - **SC-006**: Volver a una versión anterior de una semantic view no requiere ningún comando que
   reescriba el historial de Git (`git reset`, `push --force`, etc.).
 - **SC-007**: Tras desplegar una versión nueva de una semantic view, el 100% de las versiones
