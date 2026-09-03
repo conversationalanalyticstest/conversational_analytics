@@ -86,8 +86,7 @@ def test_q01_total_net_sales_2025(
     assert len(response.rows) == 1
     values = _numeric_values(response.rows[0])
     assert len(values) == 1
-    # DEMO: assert roto a proposito para el Escenario 1 de quickstart.md (revertir tras la demo).
-    _assert_matches_baseline(values[0], float(baseline) + 1)
+    _assert_matches_baseline(values[0], float(baseline))
 
 
 def test_q02_units_of_a_brand_in_a_country_and_year(
