@@ -499,12 +499,16 @@ Ver [ADR-003](decisions/003-simplificacion-semantic-view.md) para el detalle de 
       `quickstart.md` (retirar Escenario 6, ajustar Escenario 2 y 5), `README.md` (tabla CI/CD),
       y crear `decisions/003-simplificacion-semantic-view.md` con la nota de "parcialmente
       superseded" añadida a `decisions/001-estrategia-de-revert.md`.
-- [ ] T051 **Manual (requiere acceso a Snowflake con ACCOUNTADMIN o rol equivalente)** Limpiar
+- [X] T051 **Manual (requiere acceso a Snowflake con ACCOUNTADMIN o rol equivalente)** Limpiar
       objetos obsoletos creados durante el desarrollo de US5 y de los tests `writes_db`: `DROP
       TABLE IF EXISTS CICD_DEMO.DEVOPS.SEMANTIC_VIEW_VERSIONS;`, `DROP TABLE IF EXISTS
       CICD_DEMO.DEVOPS.SEMANTIC_VIEW_ACTIVE;`, y `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA;`
       para localizar y borrar cualquier objeto residual con sufijo `_V<sha>` o de prueba
-      (`SV_OPS_TEST*`, `SV_OPS_CLEANUP_*`).
+      (`SV_OPS_TEST*`, `SV_OPS_CLEANUP_*`). Ejecutado 2026-09-03 con la conexión `cicd_demo`
+      (rol `CICD_DEMO_ROLE`, dueño de todos los objetos): se borraron las 2 tablas y 4 semantic
+      views (`SV_OPS_CLEANUP_48067A34_VC28D748`, `SV_OPS_TEST_V13EC6D2`, `SV_OPS_TEST_V2158E3C`,
+      `SV_OPS_TEST_V908D437`). Verificado con `SHOW TABLES`/`SHOW SEMANTIC VIEWS`: `DEVOPS` solo
+      conserva `AGENT_TELEMETRY`/`DEPLOYMENTS`; `DATA` solo conserva `SV_PHARMA_SALES`.
 - [ ] T052 **Manual (requiere entorno GitHub configurado)** Re-ejecutar el guion completo de
       [quickstart.md](./quickstart.md) (ya sin Escenario 6) para confirmar que la demo sigue
       siendo válida de punta a punta tras la simplificación.
