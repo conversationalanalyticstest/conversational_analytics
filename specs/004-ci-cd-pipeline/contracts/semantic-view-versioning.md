@@ -1,101 +1,57 @@
-# Contrato: versionado de semantic views (`SEMANTIC_VIEW_VERSIONS` / `SEMANTIC_VIEW_ACTIVE`)
+# Contrato: despliegue de la semantic view (sin versionado propio)
 
 **Feature**: [004-ci-cd-pipeline](../spec.md) · **Data model**: [../data-model.md](../data-model.md) ·
-**Decisión**: [../decisions/001-estrategia-de-revert.md](../decisions/001-estrategia-de-revert.md)
+**Decisión**: [../decisions/003-simplificacion-semantic-view.md](../decisions/003-simplificacion-semantic-view.md)
+(supersede a [../decisions/001-estrategia-de-revert.md](../decisions/001-estrategia-de-revert.md)
+en esta parte)
 
-## DDL
+> Este contrato reemplaza al que existía originalmente aquí (dos tablas,
+> `SEMANTIC_VIEW_VERSIONS`/`SEMANTIC_VIEW_ACTIVE`, y una convención de nombres con sufijo de
+> commit). Se conserva el mismo nombre de fichero porque otros documentos ya enlazan a él.
 
-```sql
-USE ROLE CICD_DEMO_ROLE;
-USE WAREHOUSE COMPUTE_WH;
-USE SCHEMA CICD_DEMO.DEVOPS;
+## Diseño vigente
 
-CREATE TABLE IF NOT EXISTS SEMANTIC_VIEW_VERSIONS (
-    VERSION_ID   NUMBER AUTOINCREMENT,
-    BASE_NAME    STRING NOT NULL,
-    OBJECT_NAME  STRING NOT NULL,
-    COMMIT_SHA   STRING NOT NULL,
-    DDL_TEXT     STRING NOT NULL,
-    IS_CANDIDATE BOOLEAN NOT NULL DEFAULT FALSE,
-    DEPLOYED_AT  TIMESTAMP_NTZ NOT NULL DEFAULT CURRENT_TIMESTAMP()
-);
+La semantic view es **un único objeto físico**, sin sufijo de commit:
+`CICD_DEMO.DATA.SV_PHARMA_SALES`. Se despliega ejecutando
+`snowflake/004_semantic_view.sql` tal cual, exactamente igual que cualquier otro script SQL
+idempotente de la release (`002_tables.sql`, `003_seed.sql`, `005_telemetry.sql`,
+`006_deployments.sql`): `CREATE OR ALTER SEMANTIC VIEW` hace que la definición converja siempre
+a lo que dice el fichero, sin borrar ni recrear el objeto.
 
--- Puntero mutable: una fila por semantic view base. A diferencia de la tabla anterior, esta SI
--- se actualiza in place (MERGE/UPDATE), porque representa el estado actual, no un historico.
-CREATE TABLE IF NOT EXISTS SEMANTIC_VIEW_ACTIVE (
-    BASE_NAME          STRING NOT NULL,
-    ACTIVE_OBJECT_NAME STRING NOT NULL,
-    ACTIVE_COMMIT_SHA  STRING NOT NULL,
-    UPDATED_AT         TIMESTAMP_NTZ NOT NULL,
-    UPDATED_BY         STRING NOT NULL,
-    PRIMARY KEY (BASE_NAME)
-);
-```
+**No hay tablas de registro en Snowflake para esto.** El historial de definiciones es Git:
+`git log -- snowflake/004_semantic_view.sql`.
 
-## Convención de nombres (D-06)
+## Recuperar una definición anterior (rollback / revert)
 
-`<BASE_NAME>_V<sha_corto>`, con `sha_corto` = 7 caracteres hexadecimales del commit. Ejemplo:
-`SV_PHARMA_SALES_V1A2B3C4`. El prefijo `V` evita que el identificador empiece por un dígito.
-
-## Contrato de `ops/semantic_view_registry.py`
+`ops/deploy.py` expone `apply_release_artifacts(commit_sha: str) -> None`, usada tanto por un
+despliegue normal como por `ops/rollback.py` y `ops/revert.py`. Para cada script de
+`RELEASE_SQL_SCRIPTS` (incluido `004_semantic_view.sql`), lee su contenido **tal como estaba en
+`commit_sha`** con `git show <commit_sha>:snowflake/<script>.sql` — no del working tree actual —
+y lo ejecuta contra Snowflake. Esto funciona sin necesidad de que el checkout esté en ese commit
+concreto, siempre que el repositorio tenga historial completo (`fetch-depth: 0`, ya usado en los
+3 workflows).
 
 ```python
-def deploy_version(
-    *, base_name: str, ddl_template: str, commit_sha: str, is_candidate: bool
-) -> str:
-    """Crea el objeto <base_name>_V<sha_corto> con CREATE OR ALTER SEMANTIC VIEW,
-    inserta una fila en SEMANTIC_VIEW_VERSIONS y devuelve el OBJECT_NAME creado.
-    No toca SEMANTIC_VIEW_ACTIVE."""
-
-def activate_version(*, base_name: str, commit_sha: str, updated_by: str) -> None:
-    """Busca en SEMANTIC_VIEW_VERSIONS la fila (base_name, commit_sha) mas reciente
-    con IS_CANDIDATE = FALSE. Si el objeto fisico (OBJECT_NAME) ya no existe (purgado
-    por retencion), lo recrea con su DDL_TEXT. Actualiza SEMANTIC_VIEW_ACTIVE
-    (MERGE por BASE_NAME)."""
-
-def resolve_active(*, base_name: str) -> str:
-    """Devuelve ACTIVE_OBJECT_NAME para base_name. Usada por cortex_analyst.py
-    cuando no hay override explicito de SNOWFLAKE_SEMANTIC_VIEW."""
-
-def cleanup_old_versions(*, base_name: str, keep_last: int = 5) -> list[str]:
-    """Hace DROP SEMANTIC VIEW de las versiones de produccion (IS_CANDIDATE = FALSE)
-    mas antiguas que las `keep_last` mas recientes. Nunca borra la version activa.
-    Devuelve los OBJECT_NAME eliminados. Las filas de SEMANTIC_VIEW_VERSIONS NO se
-    borran (el DDL_TEXT se conserva para poder recrear la version si hace falta)."""
+def apply_release_artifacts(commit_sha: str) -> None:
+    """Aplica, contra Snowflake, cada script de RELEASE_SQL_SCRIPTS tal como estaba
+    definido en `commit_sha` (git show, no el working tree). No registra nada en
+    DEPLOYMENTS ni mueve el tag deployed-good: responsabilidad de quien llama."""
 ```
 
 ## Cambio de contrato en `cortex_analyst.py`
 
-`generate_sql()` resuelve la semantic view a consultar con esta precedencia (ninguna rompe el
-comportamiento actual en desarrollo/tests):
+`generate_sql()` resuelve la semantic view a consultar con esta precedencia (idéntica a la de la
+feature 003, sin la resolución de puntero que existió durante la Opción 2):
 
-1. `SNOWFLAKE_SEMANTIC_VIEW` en el entorno, si está definida (comportamiento actual, sin cambios;
-   lo usan `pr-checks.yml` para apuntar al objeto candidato y los tests locales).
-2. Si no está definida: `ops.semantic_view_registry.resolve_active(base_name="SV_PHARMA_SALES")`.
-3. Si la consulta anterior no devuelve fila (tabla vacía, p. ej. entorno recién creado):
-   `DEFAULT_SEMANTIC_VIEW` (constante ya existente, sin cambios).
+1. `SNOWFLAKE_SEMANTIC_VIEW` en el entorno, si está definida (override explícito para desarrollo
+   local y tests).
+2. Si no: `DEFAULT_SEMANTIC_VIEW` (`CICD_DEMO.DATA.SV_PHARMA_SALES`).
 
-## Ejemplos de consulta (sin Git, FR-016)
+## PR checks: sin despliegue de candidato
 
-**Versiones disponibles de una semantic view:**
+`pr-checks.yml` **no despliega nada**. Ejecuta `poetry run pytest` directamente contra la
+semantic view activa en producción (sin overrides). Es una limitación consciente: un cambio de
+`004_semantic_view.sql` en una PR no se valida contra Cortex Analyst real hasta el merge; la
+evaluación post-deploy y el rollback automático de `deploy.yml` son la red de seguridad para ese
+caso (ver ADR-003, sección Consecuencias).
 
-```sql
-SELECT VERSION_ID, OBJECT_NAME, COMMIT_SHA, IS_CANDIDATE, DEPLOYED_AT
-FROM SEMANTIC_VIEW_VERSIONS
-WHERE BASE_NAME = 'SV_PHARMA_SALES' AND IS_CANDIDATE = FALSE
-ORDER BY DEPLOYED_AT DESC;
-```
-
-**Cuál está activa ahora:**
-
-```sql
-SELECT ACTIVE_OBJECT_NAME, ACTIVE_COMMIT_SHA, UPDATED_AT, UPDATED_BY
-FROM SEMANTIC_VIEW_ACTIVE
-WHERE BASE_NAME = 'SV_PHARMA_SALES';
-```
-
-**Objetos físicos realmente existentes (para saber si hace falta recrear al reactivar):**
-
-```sql
-SHOW SEMANTIC VIEWS LIKE 'SV_PHARMA_SALES_V%' IN SCHEMA CICD_DEMO.DATA;
-```

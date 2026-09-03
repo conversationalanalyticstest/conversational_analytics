@@ -1,9 +1,9 @@
 """Tests de `ops.rollback` (T023): localizacion de la ultima release buena y forward-fix.
 
-`apply_release_artifacts` se sustituye por un doble ligero (el mecanismo real de despliegue de
-semantic views ya se cubre end-to-end en `tests/test_ops_semantic_view_registry.py`): aqui se
-valida solo la logica propia de `ops.rollback` — que release es "la buena", que se registra con
-los campos correctos, y que no reintenta si el propio rollback falla (FR-011).
+`apply_release_artifacts` se sustituye por un doble ligero (su propia logica de lectura via
+`git show` se cubre en `tests/test_ops_deploy.py`, ADR-003): aqui se valida solo la logica
+propia de `ops.rollback` — que release es "la buena", que se registra con los campos
+correctos, y que no reintenta si el propio rollback falla (FR-011).
 """
 
 from __future__ import annotations

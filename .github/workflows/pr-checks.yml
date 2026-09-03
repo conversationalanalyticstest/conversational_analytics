@@ -1,9 +1,10 @@
 name: pr-checks
 
 # Contrato: specs/004-ci-cd-pipeline/contracts/workflows.md#pr-checksyml
-# Valida una PR contra main: despliega una semantic view candidata desechable (US1) y
-# ejecuta la suite completa contra ella. El check "pr-checks" es el required status check
-# de la proteccion de rama (FR-002, FR-003) — se configura a mano (tasks.md T003).
+# Valida una PR contra main ejecutando la suite completa contra la semantic view activa en
+# produccion, sin desplegar nada (ver decisions/003-simplificacion-semantic-view.md, ADR-003).
+# El check "pr-checks" es el required status check de la proteccion de rama (FR-002, FR-003)
+# — se configura a mano (tasks.md T003).
 
 on:
   pull_request:
@@ -51,19 +52,5 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction
 
-      - name: Deploy candidate semantic view
-        id: deploy_candidate
-        run: poetry run python -m conversational_analytics.ops.deploy --candidate
-
-      - name: Run test suite against candidate
-        env:
-          SNOWFLAKE_SEMANTIC_VIEW: CICD_DEMO.DATA.${{ steps.deploy_candidate.outputs.object_name }}
+      - name: Run test suite
         run: poetry run pytest
-
-      # if: always() -- se ejecuta tanto si la suite paso como si fallo, para no dejar
-      # objetos candidatos huerfanos en Snowflake (contrato paso 5).
-      - name: Drop candidate semantic view
-        if: always() && steps.deploy_candidate.outputs.object_name != ''
-        run: >
-          poetry run python -m conversational_analytics.ops.deploy
-          --drop-candidate ${{ steps.deploy_candidate.outputs.object_name }}

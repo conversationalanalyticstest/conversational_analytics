@@ -44,8 +44,8 @@ jobs:
     steps:
       # El checkout usa el sha por defecto del trigger manual (rama actual); ops/revert.py NO
       # necesita que el workspace este en target_commit_sha para funcionar: re-despliega esa
-      # release aplicando los artefactos versionados en Snowflake (SEMANTIC_VIEW_VERSIONS +
-      # scripts SQL idempotentes de este checkout), no un `git checkout` del commit antiguo.
+      # release leyendo cada script SQL (incluida la semantic view) tal como estaba en
+      # target_commit_sha via `git show` (ADR-003), no un `git checkout` del commit antiguo.
       - name: Checkout (historial y tags completos)
         uses: actions/checkout@v4
         with:

@@ -29,44 +29,16 @@ relleno (siempre hay un estado anterior del que se viene). `ACTION = 'DEPLOY'` p
 
 ---
 
-### `SemanticViewVersion` (tabla `CICD_DEMO.DEVOPS.SEMANTIC_VIEW_VERSIONS`, insert-only)
+### ⚠️ `SemanticViewVersion` / `SemanticViewActive` — eliminadas (ADR-003)
 
-Una fila por cada versión de una semantic view que se ha desplegado como objeto físico,
-incluidas las candidatas de PR (ver research.md, D-04).
+Este documento incluía originalmente dos entidades más: `SemanticViewVersion` (tabla
+`SEMANTIC_VIEW_VERSIONS`, historial insert-only de versiones físicas de la semantic view) y
+`SemanticViewActive` (tabla `SEMANTIC_VIEW_ACTIVE`, puntero mutable a la versión activa).
 
-| Campo | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `VERSION_ID` | `NUMBER` (autoincrement) | Sí | Clave interna. |
-| `BASE_NAME` | `STRING` | Sí | Nombre lógico de la semantic view, p. ej. `SV_PHARMA_SALES`. |
-| `OBJECT_NAME` | `STRING` | Sí | Nombre físico del objeto en Snowflake, p. ej. `SV_PHARMA_SALES_V1A2B3C4`. |
-| `COMMIT_SHA` | `STRING` | Sí | Commit del que procede esta definición. |
-| `DDL_TEXT` | `STRING` | Sí | Sentencia `CREATE OR ALTER SEMANTIC VIEW` completa que generó este objeto. |
-| `IS_CANDIDATE` | `BOOLEAN` | Sí | `TRUE` si se desplegó solo para validar una PR (D-04); `FALSE` si es una versión de producción. |
-| `DEPLOYED_AT` | `TIMESTAMP_NTZ` | Sí | Momento del despliegue. |
-
-**Validación**: `OBJECT_NAME` MUST ser único. El objeto físico puede dejar de existir con el
-tiempo (política de retención, D-06) sin que la fila se borre: `DDL_TEXT` sigue permitiendo
-recrearlo.
-
-**Relación con FR**: FR-016, FR-017, FR-018, FR-020, SC-006, SC-007.
-
----
-
-### `SemanticViewActive` (tabla de configuración `CICD_DEMO.DEVOPS.SEMANTIC_VIEW_ACTIVE`, mutable)
-
-Una fila por cada semantic view base. Es el **puntero** que resuelve `cortex_analyst.py` en
-tiempo de ejecución. A diferencia de las dos anteriores, esta tabla se actualiza in place: no es
-un histórico, es el estado actual.
-
-| Campo | Tipo | Obligatorio | Descripción |
-|---|---|---|---|
-| `BASE_NAME` | `STRING` (PK) | Sí | p. ej. `SV_PHARMA_SALES`. |
-| `ACTIVE_OBJECT_NAME` | `STRING` | Sí | Objeto físico actualmente activo. |
-| `ACTIVE_COMMIT_SHA` | `STRING` | Sí | Commit al que corresponde esa versión. |
-| `UPDATED_AT` | `TIMESTAMP_NTZ` | Sí | Última vez que cambió el puntero. |
-| `UPDATED_BY` | `STRING` | Sí | Quién/qué lo cambió (mismo valor que `TRIGGERED_BY` de la fila de `DEPLOYMENTS` correspondiente). |
-
-**Relación con FR**: FR-018, FR-019.
+Se eliminaron por [ADR-003](decisions/003-simplificacion-semantic-view.md): duplicaban en
+Snowflake un historial que ya vive en Git (`snowflake/004_semantic_view.sql`). La semantic view
+es ahora un único objeto físico (`SV_PHARMA_SALES`), sin entidad de datos propia — se gobierna
+igual que cualquier otro script SQL idempotente de `snowflake/`.
 
 ---
 
@@ -74,8 +46,6 @@ un histórico, es el estado actual.
 
 ```mermaid
 erDiagram
-    DEPLOYMENTS ||--o{ SEMANTIC_VIEW_VERSIONS : "referencia por COMMIT_SHA"
-    SEMANTIC_VIEW_VERSIONS ||--o| SEMANTIC_VIEW_ACTIVE : "una version es la activa"
     AGENT_TELEMETRY }o--|| DEPLOYMENTS : "COMMIT_SHA coincide con TARGET_COMMIT_SHA vigente"
 ```
 
@@ -83,7 +53,7 @@ erDiagram
   fuente de evidencia "qué versión está respondiendo de verdad ahora mismo" (ver
   [ADR-002](decisions/002-rollback-automatico.md)).
 - No hay clave foránea física entre estas tablas (Snowflake no las impone de forma habitual para
-  este tipo de tablas de auditoría); la relación es lógica, por `COMMIT_SHA` / `BASE_NAME`.
+  este tipo de tablas de auditoría); la relación es lógica, por `COMMIT_SHA`.
 
 ## Máquina de estados de un `Deployment`
 

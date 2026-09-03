@@ -3,8 +3,7 @@
 **Feature**: [004-ci-cd-pipeline](./spec.md)
 
 Guion de validación manual, de extremo a extremo. Asume que la implementación de `tasks.md` ya
-está desplegada (workflows en `.github/workflows/`, tablas `006_deployments.sql` y
-`007_semantic_view_registry.sql` ya ejecutadas).
+está desplegada (workflows en `.github/workflows/`, tabla `006_deployments.sql` ya ejecutada).
 
 ## Prerrequisitos
 
@@ -16,8 +15,7 @@ está desplegada (workflows en `.github/workflows/`, tablas `006_deployments.sql
      duplicados en el Environment con protección de revisión habilitada.
 2. Protección de rama en `main`: PR obligatoria, check `pr-checks` requerido, 1 aprobación
    mínima, sin push directo.
-3. `006_deployments.sql` y `007_semantic_view_registry.sql` ya ejecutados (una vez, como
-   `001_bootstrap.sql` y los siguientes).
+3. `006_deployments.sql` ya ejecutado (una vez, como `001_bootstrap.sql` y los siguientes).
 
 ## Escenario 1 — Una PR con un test roto no se puede mergear (User Story 1)
 
@@ -39,9 +37,6 @@ Mergear una PR válida. **Esperado**, tras el run de `deploy.yml`:
 ```sql
 SELECT * FROM CICD_DEMO.DEVOPS.DEPLOYMENTS ORDER BY DEPLOYED_AT DESC LIMIT 1;
 -- ACTION = 'DEPLOY', TARGET_COMMIT_SHA = <sha del merge>, STATUS = 'SUCCESS'
-
-SELECT * FROM CICD_DEMO.DEVOPS.SEMANTIC_VIEW_ACTIVE WHERE BASE_NAME = 'SV_PHARMA_SALES';
--- ACTIVE_COMMIT_SHA = <mismo sha>
 ```
 
 ```powershell
@@ -81,8 +76,9 @@ Issue `drift` se cierra automáticamente al final de ese `deploy.yml`.
 En GitHub → Actions → `revert.yml` → *Run workflow*, con `target_commit_sha` = un SHA de una
 release exitosa anterior (consultarlo con la query de
 [deployments-table.md](contracts/deployments-table.md)). **Esperado**: nueva fila en
-`DEPLOYMENTS` con `ACTION = 'MANUAL_REVERT'` y `TRIGGERED_BY` = tu usuario de GitHub;
-`SEMANTIC_VIEW_ACTIVE` apunta de nuevo a esa versión.
+`DEPLOYMENTS` con `ACTION = 'MANUAL_REVERT'` y `TRIGGERED_BY` = tu usuario de GitHub; la semantic
+view queda con la definición que tenía ese commit (recuperada vía `git show`, ver
+[ADR-003](decisions/003-simplificacion-semantic-view.md)).
 
 Repetir con un SHA inventado (`target_commit_sha = 0000000`): el workflow **falla en el primer
 paso**, sin tocar Snowflake (FR-014).
@@ -91,23 +87,9 @@ paso**, sin tocar Snowflake (FR-014).
 `MANUAL_REVERT` con `STATUS = 'SUCCESS'` MUST pasar menos de 5 minutos, y MUST ser una única
 acción (rellenar el input y confirmar), sin pasos manuales adicionales en Snowflake.
 
-## Escenario 6 — Consultar y reactivar una versión de semantic view sin Git (User Story 5)
-
-```sql
-SELECT VERSION_ID, OBJECT_NAME, COMMIT_SHA, DEPLOYED_AT
-FROM CICD_DEMO.DEVOPS.SEMANTIC_VIEW_VERSIONS
-WHERE BASE_NAME = 'SV_PHARMA_SALES' AND IS_CANDIDATE = FALSE
-ORDER BY DEPLOYED_AT DESC;
-
-SHOW SEMANTIC VIEWS LIKE 'SV_PHARMA_SALES_V%' IN SCHEMA CICD_DEMO.DATA;
-```
-
-Reactivar cualquiera de las versiones listadas es, en la práctica, el mismo Escenario 5 (un
-revert de release), sin ejecutar `git reset`, `git revert` ni tocar el historial del repositorio.
-
 ## Validación con tests automáticos
 
 ```powershell
-poetry run pytest tests/test_ops_deploy.py tests/test_ops_semantic_view_registry.py `
-  tests/test_ops_drift.py tests/test_cortex_analyst_resolves_active_view.py -v
+poetry run pytest tests/test_ops_deploy.py tests/test_ops_drift.py `
+  tests/test_cortex_analyst_resolves_active_view.py -v
 ```

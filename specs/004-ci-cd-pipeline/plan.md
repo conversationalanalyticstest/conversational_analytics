@@ -11,17 +11,19 @@ implementa:
 
 | Workflow | Disparador | Qué hace |
 |---|---|---|
-| `pr-checks.yml` | PR abierta/actualizada contra `main` | Despliega una versión **candidata** de la semantic view (sin tocar la activa) y ejecuta la suite completa de tests contra ella. Bloquea el merge si falla (FR-001 a FR-004). |
-| `deploy.yml` | Push a `main` (merge) | Re-ejecuta la suite completa; si pasa, despliega (agente + semantic view versionada); ejecuta la evaluación post-deploy contra lo ya desplegado; si falla, dispara rollback automático (*forward-fix*); en cualquier caso, actualiza la señal de *drift* (FR-005 a FR-011, FR-015, FR-021, FR-022). |
+| `pr-checks.yml` | PR abierta/actualizada contra `main` | Ejecuta la suite completa de tests contra la semantic view activa en producción, sin desplegar nada. Bloquea el merge si falla (FR-001 a FR-004). |
+| `deploy.yml` | Push a `main` (merge) | Re-ejecuta la suite completa; si pasa, despliega (agente + semantic view, ambos actualizados in place); ejecuta la evaluación post-deploy contra lo ya desplegado; si falla, dispara rollback automático (*forward-fix*); en cualquier caso, actualiza la señal de *drift* (FR-005 a FR-011, FR-015, FR-021, FR-022). |
 | `revert.yml` | Manual (`workflow_dispatch`, input `target_commit_sha`) | Reactiva la release indicada (agente + semantic view) sin reconstruir pasos a mano; rechaza SHAs sin despliegue exitoso previo (FR-012 a FR-014). |
 
-El punto de diseño no obvio, heredado de [ADR-001](decisions/001-estrategia-de-revert.md) y
-[ADR-002](decisions/002-rollback-automatico.md): **la semantic view no se sobrescribe, se
-versiona**. Cada despliegue crea un objeto `SV_PHARMA_SALES_V<sha_corto>` nuevo y mueve un
-**puntero** en una tabla de Snowflake; "revertir la semantic view" es cambiar ese puntero, no
-volver a ejecutar DDL. El rollback/revert de la *release* sigue siendo atómico (agente + semantic
-view juntos, FR-019); lo que cambia es que la parte de semantic view de esa operación es barata
-e instantánea.
+El punto de diseño no obvio, heredado de [ADR-003](decisions/003-simplificacion-semantic-view.md)
+(que revierte la parte de versionado con puntero de
+[ADR-001](decisions/001-estrategia-de-revert.md)) y
+[ADR-002](decisions/002-rollback-automatico.md): **la semantic view es un único objeto físico**,
+actualizado siempre in place con `CREATE OR ALTER SEMANTIC VIEW`, igual que cualquier otro
+script SQL idempotente. No hay tabla de versiones ni puntero en Snowflake: el historial de
+definiciones es Git. El rollback/revert de la *release* sigue siendo atómico (agente + semantic
+view juntos, FR-019); para recuperar una definición anterior de la semantic view, se lee su
+contenido en el commit objetivo con `git show` y se re-aplica.
 
 Toda la lógica de despliegue/rollback/revert vive en Python (`src/conversational_analytics/ops/`),
 no en `bash` incrustado en YAML: así se puede testear con `pytest` (Principio II) y los workflows
@@ -39,27 +41,25 @@ solo para el pipeline; ver decisión D-01 en [research.md](./research.md)). Acci
 GitHub Marketplace usadas: `actions/checkout`, `actions/setup-python` — ambas ya oficiales de
 GitHub, fijadas por versión mayor. No se añade ninguna acción de terceros no oficial.
 
-**Storage**: Snowflake, esquema `CICD_DEMO.DEVOPS` (ya existe). Tablas nuevas:
+**Storage**: Snowflake, esquema `CICD_DEMO.DEVOPS` (ya existe). Tabla nueva:
 
 - `DEPLOYMENTS` — registro insert-only de toda acción de despliegue/rollback/revert (auditoría,
   ADR-002).
-- `SEMANTIC_VIEW_VERSIONS` — registro insert-only de cada versión desplegada de una semantic
-  view, con su DDL completo (ADR-001).
-- `SEMANTIC_VIEW_ACTIVE` — tabla de configuración **mutable** (una fila por semantic view base)
-  que apunta a la versión activa. Es el único objeto de este diseño que se actualiza en lugar de
-  solo insertarse en él, porque es un puntero, no un histórico.
+
+No hay tablas de versionado de semantic view (ver [ADR-003](decisions/003-simplificacion-semantic-view.md)):
+la semantic view es un único objeto físico, gobernado por Git igual que el resto de scripts de
+`snowflake/`.
 
 **Testing**: `pytest` (ya presente), extendiendo la suite existente. Tests nuevos, todos capaces
 de correr sin credenciales reales salvo los que ya tocaban Snowflake:
 
 - `tests/test_ops_deploy.py` — aplica un despliegue de prueba contra el esquema real (marcado
-  `writes_db`) y verifica que `DEPLOYMENTS` y `SEMANTIC_VIEW_VERSIONS` reciben una fila.
-- `tests/test_ops_semantic_view_registry.py` — crea dos versiones y comprueba activar/consultar
-  sin `git`.
+  `writes_db`) y verifica que `DEPLOYMENTS` recibe una fila, y que `apply_release_artifacts` lee
+  cada script vía `git show <sha>:snowflake/<script>.sql`.
 - `tests/test_ops_drift.py` — no toca Snowflake; opera sobre SHAs de ejemplo y verifica la lógica
   de comparación.
 - `tests/test_cortex_analyst_resolves_active_view.py` — verifica que `cortex_analyst.py` resuelve
-  la vista activa vía la tabla puntero cuando no hay override por variable de entorno.
+  `DEFAULT_SEMANTIC_VIEW` cuando no hay override por variable de entorno.
 
 **Target Platform**: GitHub Actions (`ubuntu-latest`) + la misma cuenta Snowflake de siempre.
 
@@ -85,8 +85,8 @@ drift en <1 min tras consultarlo (SC-008).
   en el repo y añadirlo, si se quiere en el futuro, es una decisión independiente de esta
   feature.
 
-**Scale/Scope**: 3 workflows, 1 subpaquete Python (~5 módulos), 2 tablas nuevas + 1 tabla de
-configuración, 4 ficheros de test nuevos, 1 cambio pequeño en `cortex_analyst.py`.
+**Scale/Scope**: 3 workflows, 1 subpaquete Python (~4 módulos), 1 tabla nueva, 3 ficheros de test
+nuevos, 1 cambio pequeño en `cortex_analyst.py`.
 
 ## Constitution Check
 
@@ -100,7 +100,7 @@ configuración, 4 ficheros de test nuevos, 1 cambio pequeño en `cortex_analyst.
 |---|---|
 | 3 workflows en vez de 1 | Cada uno responde a un disparador y una audiencia distintos (PR, merge, acción manual). Fusionarlos en uno con `if` anidados sería más corto pero menos explicable en cinco minutos: cada fichero es "una caja del diagrama". |
 | Paquete `ops/` en Python en vez de `bash` en YAML | Es lo mínimo que permite testear la lógica de despliegue/rollback con `pytest` (Principio II exige tests, no solo scripts). El YAML queda reducido a invocar comandos, que es su rol correcto. |
-| Semantic view versionada + puntero, en vez de `CREATE OR ALTER` in-place | Decisión ya justificada y aceptada en [ADR-001](decisions/001-estrategia-de-revert.md): es lo que hace el revert de la semantic view instantáneo y no destructivo, a cambio de una tabla más. |
+| Semantic view como objeto único, actualizado in place (`CREATE OR ALTER`) | Decisión de [ADR-003](decisions/003-simplificacion-semantic-view.md): el historial ya vive en Git; una tabla de versiones en Snowflake lo duplicaba sin necesidad. |
 | Forward-fix en vez de `git revert` automático | Decisión ya justificada y aceptada en [ADR-002](decisions/002-rollback-automatico.md). |
 | **Rechazado**: `snow` CLI en CI | Añadiría una herramienta y su configuración de conexión solo para el pipeline, cuando `conn.execute_string()` del conector ya presente hace lo mismo con el código que ya existe en `db.py`. |
 | **Rechazado**: pre-commit en esta feature | No estaba en la petición del usuario y el repo no lo tiene hoy; añadirlo aquí ensancharía el alcance sin necesidad. |
@@ -126,8 +126,8 @@ documentado: usa el mismo camino de código que el despliegue normal (ver
 
 ### Principio IV — Observabilidad y Control de Coste
 
-**PASA**. `DEPLOYMENTS` y `SEMANTIC_VIEW_VERSIONS` son consultables con SQL como el resto del
-proyecto. No se introduce coste de tokens nuevo (esta feature no toca prompts ni modelo). El
+**PASA**. `DEPLOYMENTS` es consultable con SQL como el resto del
+proyecto; el historial de la semantic view es consultable con `git log`. No se introduce coste de tokens nuevo (esta feature no toca prompts ni modelo). El
 coste operativo nuevo es el de ejecutar la suite completa de tests (que ya invoca Cortex Analyst
 y, según `LLM_PROVIDER`, la API de OpenAI) en cada PR y en cada merge; se documenta como
 consecuencia aceptada en [research.md](./research.md), D-03, no como coste oculto.
@@ -147,10 +147,10 @@ Reevaluado tras `research.md`, `data-model.md`, `contracts/` y `quickstart.md`.
 
 | Principio | Antes | Después | Comentario |
 |---|---|---|---|
-| I Simplicidad | PASA | **PASA** | El diseño final mantiene 3 workflows y 5 módulos en `ops/`; ninguno creció por encima de lo descrito aquí. |
-| II Evaluación como test | PASA | **PASA** | Los 4 ficheros de test nuevos quedan enumerados en [quickstart.md](./quickstart.md) con su escenario de validación. |
+| I Simplicidad | PASA | **PASA** | El diseño final mantiene 3 workflows y 4 módulos en `ops/`; se simplificó tras detectar duplicación con Git (ADR-003). |
+| II Evaluación como test | PASA | **PASA** | Los ficheros de test nuevos quedan enumerados en [quickstart.md](./quickstart.md) con su escenario de validación. |
 | III CI/CD | PASA | **PASA** | El contrato de workflows ([contracts/workflows.md](contracts/workflows.md)) fija disparadores, permisos y *concurrency* exactos. |
-| IV Observabilidad | PASA | **PASA** | Los esquemas de `DEPLOYMENTS` y `SEMANTIC_VIEW_VERSIONS` quedan cerrados en [data-model.md](./data-model.md) y [contracts/deployments-table.md](contracts/deployments-table.md). |
+| IV Observabilidad | PASA | **PASA** | El esquema de `DEPLOYMENTS` queda cerrado en [data-model.md](./data-model.md) y [contracts/deployments-table.md](contracts/deployments-table.md). |
 | V Reproducibilidad | PASA | **PASA** | Sin cambios; ver lista de secretos requeridos en [quickstart.md](./quickstart.md). |
 
 Sin violaciones nuevas.
@@ -163,17 +163,18 @@ Sin violaciones nuevas.
 specs/004-ci-cd-pipeline/
 ├── plan.md                              # Este fichero
 ├── research.md                          # Fase 0 — decisiones D-01..D-12
-├── data-model.md                        # Fase 1 — entidades: Deployment, SemanticViewVersion, SemanticViewActive
+├── data-model.md                        # Fase 1 — entidad: Deployment
 ├── quickstart.md                        # Fase 1 — guion de validación end-to-end
 ├── contracts/
 │   ├── workflows.md                     # Contrato de los 3 workflows de GitHub Actions
 │   ├── deployments-table.md             # DDL y consultas de DEPLOYMENTS
-│   └── semantic-view-versioning.md      # DDL de SEMANTIC_VIEW_VERSIONS/ACTIVE + contrato de ops/
+│   └── semantic-view-versioning.md      # Diseño vigente: objeto único, sin tablas propias
 ├── checklists/
 │   └── requirements.md                  # Fase specify (ya existente)
 ├── decisions/
-│   ├── 001-estrategia-de-revert.md      # ADR-001 (ya existente)
-│   └── 002-rollback-automatico.md       # ADR-002 (ya existente)
+│   ├── 001-estrategia-de-revert.md      # ADR-001 (ya existente, parcialmente superseded)
+│   ├── 002-rollback-automatico.md       # ADR-002 (ya existente)
+│   └── 003-simplificacion-semantic-view.md  # ADR-003 — elimina el versionado con puntero
 └── tasks.md                             # Fase 3 — NO lo genera speckit-plan
 ```
 
@@ -182,32 +183,29 @@ specs/004-ci-cd-pipeline/
 ```text
 .github/
 └── workflows/
-    ├── pr-checks.yml      # NUEVO — despliegue candidato + suite completa en PR
+    ├── pr-checks.yml      # NUEVO — suite completa en PR, sin desplegar nada
     ├── deploy.yml         # NUEVO — tests + despliegue + post-deploy + rollback automático + drift
     └── revert.yml         # NUEVO — workflow_dispatch de revert manual
 
 src/conversational_analytics/
 ├── db.py                          # existente — sin cambios
-├── cortex_analyst.py              # MODIFICAR — resuelve la semantic view activa vía puntero
+├── cortex_analyst.py              # MODIFICAR — env override → DEFAULT_SEMANTIC_VIEW
 └── ops/                           # NUEVO subpaquete
     ├── __init__.py
-    ├── sql_runner.py               # aplica ficheros .sql idempotentes vía db.get_connection()
-    ├── semantic_view_registry.py   # crea versiones, activa/consulta el puntero, retención
+    ├── sql_runner.py               # aplica ficheros/contenido .sql idempotentes vía db.get_connection()
     ├── deployments_log.py          # inserta filas en DEPLOYMENTS
-    ├── deploy.py                   # orquesta un despliegue completo (release → Snowflake)
+    ├── deploy.py                   # orquesta un despliegue completo (release → Snowflake, vía git show)
     ├── rollback.py                 # localiza última release buena y re-despliega (forward-fix)
     ├── revert.py                   # revert manual a un commit SHA concreto, con validación
     └── drift.py                   # compara "deployed-good" vs HEAD de main, sin credenciales
 
 tests/
 ├── test_ops_deploy.py                       # NUEVO
-├── test_ops_semantic_view_registry.py       # NUEVO
 ├── test_ops_drift.py                        # NUEVO
 └── test_cortex_analyst_resolves_active_view.py  # NUEVO
 
 snowflake/
-├── 006_deployments.sql              # NUEVO — tabla DEPLOYMENTS
-└── 007_semantic_view_registry.sql   # NUEVO — SEMANTIC_VIEW_VERSIONS + SEMANTIC_VIEW_ACTIVE
+└── 006_deployments.sql              # NUEVO — tabla DEPLOYMENTS
 ```
 
 **Structure Decision**: Single project. El subpaquete `ops/` vive dentro del paquete ya existente
@@ -219,7 +217,11 @@ que `pytest` lo recoja igual que al resto del código. Los workflows quedan redu
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|---------------------------------------|
-| Dos tablas nuevas (`DEPLOYMENTS`, `SEMANTIC_VIEW_VERSIONS`) más una tabla de configuración (`SEMANTIC_VIEW_ACTIVE`) | Auditoría (insert-only) y puntero (mutable) tienen semánticas distintas; mezclarlas en una sola tabla obligaría a "actualizar" filas de un histórico, rompiendo la garantía de insert-only que exige la trazabilidad (ADR-001, ADR-002). | Una única tabla mutable con una columna `IS_ACTIVE`: ya se descartó en el ADR-001 porque complica saber "qué pasó" frente a "qué está activo ahora"; aquí se separan por la misma razón. |
-| Despliegue de una semantic view **candidata** en cada PR (no solo tests unitarios) | La constitución exige que la suite de evaluación pase contra Cortex Analyst real; un cambio de semantic view no se puede validar sin desplegar (aunque sea una copia) esa definición. | Testear solo con mocks de Cortex Analyst: no cumpliría el Principio II ("SQL sintácticamente válido y ejecutable" contra la vista real), y ya se descartó implícitamente en la feature 003. |
-| Paquete `ops/` en Python (5 módulos) en vez de scripts `bash` sueltos | Es la única forma de que la lógica de despliegue/rollback tenga tests (Principio II); un script de shell sin tests es exactamente lo que la constitución quiere evitar para "todo cambio en la lógica del agente **o del pipeline**". | `bash` embebido en cada YAML: más rápido de escribir, pero no testeable, duplicado entre workflows, y es la causa típica de que "el rollback nunca se ha probado" (cita literal del Principio III). |
+| Paquete `ops/` en Python (4 módulos) en vez de scripts `bash` sueltos | Es la única forma de que la lógica de despliegue/rollback tenga tests (Principio II); un script de shell sin tests es exactamente lo que la constitución quiere evitar para "todo cambio en la lógica del agente **o del pipeline**". | `bash` embebido en cada YAML: más rápido de escribir, pero no testeable, duplicado entre workflows, y es la causa típica de que "el rollback nunca se ha probado" (cita literal del Principio III). |
+
+> **Nota**: esta feature llegó a tener, durante su implementación inicial, una fila adicional
+> aquí sobre versionado de semantic view con puntero y despliegue de candidatos en PR. Se
+> eliminó por [ADR-003](decisions/003-simplificacion-semantic-view.md): ambas piezas duplicaban
+> mecanismos que ya existían (Git como historial; la suite de tests corriendo sin aislamiento en
+> la feature 003) sin aportar beneficio proporcional a la complejidad añadida.
 

@@ -1,15 +1,12 @@
-"""Tests de `ops.sql_runner`, `ops.deployments_log` y los dos modos de `ops.deploy` (T007, T017).
+"""Tests de `ops.sql_runner`, `ops.deployments_log` y `ops.deploy` (T007, T017, ADR-003).
 
 Los tests de `sql_runner`/`deployments_log` escriben de verdad en Snowflake (`writes_db`): son
 el unico modo de validar que un `.sql` idempotente converge y que una fila se puede releer tal
 cual se inserto.
 
-El modo de release completa de `ops.deploy` (`deploy_release`) reutiliza
-`semantic_view_registry.deploy_version`/`activate_version`, ya cubiertos end-to-end en
-`tests/test_ops_semantic_view_registry.py` (que sí crea objetos reales de Snowflake, coste de
-varios minutos). Aquí se sustituye `apply_release_artifacts` por un doble ligero para validar
-solo la orquestación propia de `deploy_release` (SHA anterior, alta en `DEPLOYMENTS`) sin pagar
-ese coste una segunda vez (Principio I).
+El modo de release completa de `ops.deploy` (`deploy_release`) se testea sustituyendo
+`apply_release_artifacts` por un doble ligero, para validar solo la orquestación propia
+(SHA anterior, alta en `DEPLOYMENTS`) sin pagar el coste de aplicar SQL real (Principio I).
 """
 
 from __future__ import annotations
@@ -53,6 +50,34 @@ def test_run_sql_file_applies_idempotent_script_twice(
         assert count == 1
     finally:
         scalar(f"DROP TABLE IF EXISTS CICD_DEMO.DEVOPS.{table_name}")
+
+
+# ---------------------------------------------------------------------------
+# ops.deploy.apply_release_artifacts (ADR-003: lee cada script via `git show`)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_release_artifacts_reads_every_script_at_target_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`apply_release_artifacts` no lee `snowflake/*.sql` del disco: pide el contenido de cada
+    script tal como estaba en `commit_sha` (ADR-003) y lo ejecuta con `run_sql_string`."""
+    sha = "deadbeef1234"
+    read_calls: list[tuple[str, str]] = []
+    run_calls: list[str] = []
+
+    def _fake_read(commit_sha: str, script_name: str) -> str:
+        read_calls.append((commit_sha, script_name))
+        return f"-- contenido de {script_name} en {commit_sha}"
+
+    monkeypatch.setattr(deploy, "_read_sql_at_commit", _fake_read)
+    monkeypatch.setattr(deploy.sql_runner, "run_sql_string", run_calls.append)
+
+    deploy.apply_release_artifacts(sha)
+
+    assert read_calls == [(sha, script) for script in deploy.RELEASE_SQL_SCRIPTS]
+    assert "004_semantic_view.sql" in deploy.RELEASE_SQL_SCRIPTS
+    assert len(run_calls) == len(deploy.RELEASE_SQL_SCRIPTS)
 
 
 # ---------------------------------------------------------------------------
@@ -172,13 +197,12 @@ def test_deploy_release_records_deploy_row_with_previous_sha(
 
     applied_shas: list[str] = []
     monkeypatch.setattr(
-        deploy, "apply_release_artifacts", lambda sha: applied_shas.append(sha) or "SV_STUB"
+        deploy, "apply_release_artifacts", lambda sha: applied_shas.append(sha)
     )
 
     new_sha = uuid.uuid4().hex[:12]
-    object_name = deploy.deploy_release(commit_sha=new_sha)
+    deploy.deploy_release(commit_sha=new_sha)
 
-    assert object_name == "SV_STUB"
     assert applied_shas == [new_sha]
 
     row = fetch_one(
@@ -192,22 +216,3 @@ def test_deploy_release_records_deploy_row_with_previous_sha(
     # `baseline_sha` si otros tests insertaron filas mas recientes en la misma sesion, pero
     # nunca puede ser el propio `new_sha`.
     assert previous != new_sha
-
-
-def test_deploy_candidate_does_not_touch_deployments(monkeypatch: pytest.MonkeyPatch) -> None:
-    """El modo `--candidate` (US1) nunca llama a `deployments_log.record`."""
-    calls: list[str] = []
-    monkeypatch.setattr(
-        deploy.semantic_view_registry,
-        "deploy_version",
-        lambda **kwargs: calls.append(kwargs["commit_sha"]) or "SV_CANDIDATE_STUB",
-    )
-
-    def _fail_if_called(*args: Any, **kwargs: Any) -> None:
-        raise AssertionError("deploy_candidate no debe registrar nada en DEPLOYMENTS")
-
-    monkeypatch.setattr(deployments_log, "record", _fail_if_called)
-
-    object_name = deploy.deploy_candidate(commit_sha="abc1234")
-    assert object_name == "SV_CANDIDATE_STUB"
-    assert calls == ["abc1234"]

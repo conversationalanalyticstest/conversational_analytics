@@ -2,8 +2,15 @@
 
 **Fecha**: 2026-09-03
 **Feature**: [004-ci-cd-pipeline](../spec.md)
-**Estado**: Aceptada
+**Estado**: ⚠️ Parcialmente superseded por [ADR-003](./003-simplificacion-semantic-view.md)
 **Afecta a**: FR-010, FR-012, FR-014, FR-016 · User Stories 3, 4 y 5
+
+> **Nota (2026-09-15)**: la "Opción 2 aplicada a la semantic view" descrita en la sección
+> Decisión (versionado con puntero, `SEMANTIC_VIEW_VERSIONS`/`SEMANTIC_VIEW_ACTIVE`) fue
+> revertida por [ADR-003](./003-simplificacion-semantic-view.md): resultó estar duplicando una
+> fuente de verdad que ya existía en Git. El resto de este documento (Opción 1, release atómica
+> como unidad de revert, forward-fix) **sigue vigente**. Se conserva sin reescribir como registro
+> histórico de la decisión original.
 
 ## Contexto
 

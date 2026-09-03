@@ -61,68 +61,21 @@ proponer una excepción.
 
 ---
 
-## D-04: Cómo se testea un cambio de semantic view en una PR sin tocar la versión activa
+## D-04, D-05, D-06: ⚠️ SUPERSEDED por ADR-003 — versionado de semantic view con puntero
 
-**Decision**: `pr-checks.yml` despliega una versión **candidata** de la semantic view, nombrada
-con el SHA de la cabeza de la PR (`SV_PHARMA_SALES_V<sha_corto>`), usando el mismo mecanismo de
-`ops/semantic_view_registry.py` que usa `deploy.yml` — pero **sin** actualizar
-`SEMANTIC_VIEW_ACTIVE`. La suite de tests se ejecuta con `SNOWFLAKE_SEMANTIC_VIEW` apuntando
-explícitamente a ese objeto candidato (el override que `cortex_analyst.py` **ya soporta** desde
-la feature 003, sin ningún cambio de código adicional). Al terminar el job, se hace
-`DROP SEMANTIC VIEW IF EXISTS` del objeto candidato, pase o falle la suite.
+Estas tres decisiones (semantic view **candidata** en PR, esquema de
+`SEMANTIC_VIEW_VERSIONS`/`SEMANTIC_VIEW_ACTIVE`, y convención de nombres/retención
+`SV_PHARMA_SALES_V<sha_corto>`) implementaban la Opción 2 de
+[ADR-001](decisions/001-estrategia-de-revert.md). Se revirtieron por
+[ADR-003](decisions/003-simplificacion-semantic-view.md): duplicaban en Snowflake un historial
+que Git ya tiene, y el revert nunca llegó a usarlas correctamente (leía el working tree actual,
+no el commit objetivo).
 
-**Rationale**: la constitución exige que la evaluación se ejecute contra Cortex Analyst real
-sobre la semantic view real, no contra un mock; sin desplegar algo, no hay nada que evaluar. Al
-no tocar el puntero activo, la producción no se entera de que hay una PR en marcha. Al limpiar el
-objeto al final, no se acumulan candidatos de PRs abandonadas.
-
-**Alternatives considered**: ejecutar los tests contra la versión ya activa en producción, sin
-desplegar nada nuevo. Descartado: no validaría el cambio real propuesto por la PR, solo el
-estado actual — exactamente el escenario que Principio II quiere impedir.
-
----
-
-## D-05: Esquema de `SEMANTIC_VIEW_VERSIONS` y `SEMANTIC_VIEW_ACTIVE`
-
-**Decision**: dos tablas con responsabilidades distintas (ver [data-model.md](./data-model.md)
-y [contracts/semantic-view-versioning.md](contracts/semantic-view-versioning.md) para el DDL
-completo):
-
-- `SEMANTIC_VIEW_VERSIONS` — **insert-only**. Una fila por versión desplegada (incluidas las
-  candidatas de PR), con el DDL completo (`DDL_TEXT`), para poder recrear cualquier versión
-  aunque el objeto físico ya no exista.
-- `SEMANTIC_VIEW_ACTIVE` — **mutable**, una fila por semantic view base. Es el puntero que
-  `cortex_analyst.py` consulta en tiempo de ejecución.
-
-**Rationale**: mezclar histórico y puntero en una tabla (p. ej. con una columna `IS_ACTIVE`)
-obligaría a hacer `UPDATE` sobre un histórico, perdiendo la garantía de auditoría insert-only.
-Separarlas es coherente con la misma razón que llevó a separar `DEPLOYMENTS` (log) del propio
-estado desplegado.
-
-**Alternatives considered**: una sola tabla con `IS_ACTIVE BOOLEAN`. Descartada por lo anterior;
-además, complica la consulta "qué versiones existen" (habría que filtrar candidatas, y una fila
-"activa" residual de una versión ya borrada físicamente sería ambigua).
-
----
-
-## D-06: Convención de nombres y retención de versiones de semantic view
-
-**Decision**: `SV_PHARMA_SALES_V<sha_corto>`, con `sha_corto` = 7 caracteres hexadecimales del
-commit SHA. Se conservan como **objetos físicos** las últimas 5 versiones desplegadas a
-producción (no las candidatas de PR, que se borran al final del job de PR — D-04). Versiones más
-antiguas se **borran físicamente** pero su fila en `SEMANTIC_VIEW_VERSIONS` permanece, con el
-`DDL_TEXT` completo: reactivarlas sigue siendo posible, solo que en vez de un cambio de puntero
-instantáneo requiere recrear el objeto con `CREATE OR ALTER SEMANTIC VIEW` a partir de ese
-`DDL_TEXT` (el mismo mecanismo *forward-fix* del ADR-002, aplicado a un solo objeto).
-
-**Rationale**: un identificador de Snowflake no puede empezar por un dígito sin comillas; el
-prefijo `V` lo evita sin necesidad de citar el identificador. La retención acotada cumple FR-020
-sin perder la capacidad de auditoría ni la posibilidad de volver, aunque más lenta, a cualquier
-versión histórica.
-
-**Alternatives considered**: conservar todas las versiones indefinidamente. Descartado: crecer
-sin límite es exactamente lo que FR-020 pide evitar, y en una demo de datos ficticios no aporta
-valor pedagógico conservar cientos de objetos.
+**Diseño vigente**: la semantic view es un único objeto físico (`SV_PHARMA_SALES`), actualizado
+in place igual que el resto de scripts SQL idempotentes. `pr-checks.yml` no despliega nada: los
+tests de una PR corren contra la semantic view activa en producción. El rollback/revert
+recuperan una definición anterior con `git show <sha>:snowflake/004_semantic_view.sql`, no con
+una tabla de registro. Ver ADR-003 para el detalle completo.
 
 ---
 

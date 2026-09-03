@@ -18,15 +18,20 @@ final de cada fase de historia y de nuevo, completo, en el Polish final.
 
 **Organization**: Agrupadas por historia de usuario según `spec.md`. US1 y US2 son P1 y juntas
 forman el MVP (una PR con tests rotos no mergea; un merge válido despliega con SHA identificable).
-US3 y US4 (P2) añaden la capacidad de deshacer una release, automática y manualmente. US5 (P3) es
-la mejora de conveniencia sobre versiones de semantic view ya cubierta en su mecanismo base por la
-fase Foundational.
+US3 y US4 (P2) añaden la capacidad de deshacer una release, automática y manualmente.
+
+> ⚠️ **US5 (P3) fue retirada** por [ADR-003](decisions/003-simplificacion-semantic-view.md): la
+> semantic view es un único objeto físico actualizado in place, sin historial propio en
+> Snowflake que consultar/reactivar. Las tareas T031-T034 (Phase 7) quedan marcadas como
+> superseded más abajo; ver Phase 10 para las tareas de la simplificación.
 
 **Arquitectura (recordatorio de plan.md)**: toda la lógica de despliegue/rollback/revert vive en
 `src/conversational_analytics/ops/` (Python, testeable); los tres workflows de
 `.github/workflows/` son orquestación fina que invoca `poetry run python -m
-conversational_analytics.ops.<modulo>`. La semantic view no se sobrescribe: se versiona
-(`SEMANTIC_VIEW_VERSIONS`) y se activa moviendo un puntero (`SEMANTIC_VIEW_ACTIVE`).
+conversational_analytics.ops.<modulo>`. ⚠️ La semantic view **ya no se versiona** en Snowflake:
+es un único objeto físico, actualizado siempre in place con `CREATE OR ALTER SEMANTIC VIEW`; el
+historial y la recuperación de versiones anteriores se apoyan en `git show` (ver Phase 10,
+[ADR-003](decisions/003-simplificacion-semantic-view.md)).
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -41,7 +46,8 @@ Proyecto único (ver "Project Structure" en [plan.md](./plan.md)):
 - `.github/workflows/` — los 3 workflows nuevos
 - `src/conversational_analytics/ops/` — subpaquete nuevo con toda la lógica de despliegue
 - `src/conversational_analytics/cortex_analyst.py` — se modifica (resolución de vista activa)
-- `snowflake/` — 2 scripts SQL nuevos (`006_deployments.sql`, `007_semantic_view_registry.sql`)
+- `snowflake/` — 1 script SQL nuevo (`006_deployments.sql`); `007_semantic_view_registry.sql`
+  se creó y luego se eliminó (ver Phase 10, ADR-003)
 - `tests/` — 4+ ficheros de test nuevos
 
 ---
@@ -82,17 +88,18 @@ una semantic view candidata con este mismo mecanismo).
 
 - [X] T004 [P] Crear `snowflake/006_deployments.sql` con el DDL de `DEPLOYMENTS`
       (`CREATE TABLE IF NOT EXISTS`, ver [contracts/deployments-table.md](contracts/deployments-table.md)).
-- [X] T005 [P] Crear `snowflake/007_semantic_view_registry.sql` con el DDL de
-      `SEMANTIC_VIEW_VERSIONS` y `SEMANTIC_VIEW_ACTIVE`
+- [X] T005 [P] ⚠️ SUPERSEDED (ver Phase 10) Crear `snowflake/007_semantic_view_registry.sql` con
+      el DDL de `SEMANTIC_VIEW_VERSIONS` y `SEMANTIC_VIEW_ACTIVE`
       (ver [contracts/semantic-view-versioning.md](contracts/semantic-view-versioning.md)).
-- [X] T006 Ejecutar `006_deployments.sql` y `007_semantic_view_registry.sql` contra Snowflake (una
-      vez, igual que `001_bootstrap.sql`..`005_telemetry.sql`) y verificar con
+- [X] T006 ⚠️ SUPERSEDED (ver Phase 10) Ejecutar `006_deployments.sql` y
+      `007_semantic_view_registry.sql` contra Snowflake (una vez, igual que
+      `001_bootstrap.sql`..`005_telemetry.sql`) y verificar con
       `SHOW TABLES IN SCHEMA CICD_DEMO.DEVOPS;` que las 3 tablas existen (depende de T004, T005).
 - [X] T007 [P] Escribir `tests/test_ops_deploy.py` cubriendo `ops.sql_runner.run_sql_file()`
       (aplica un `.sql` de prueba idempotente) y `ops.deployments_log.record()` (inserta una fila
       y se puede releer); marcar con `@pytest.mark.writes_db`. Debe **fallar** antes de T010/T011.
-- [X] T008 [P] Escribir `tests/test_ops_semantic_view_registry.py` cubriendo
-      `deploy_version()` (crea objeto + fila en `SEMANTIC_VIEW_VERSIONS`),
+- [X] T008 [P] ⚠️ SUPERSEDED (ver Phase 10) Escribir `tests/test_ops_semantic_view_registry.py`
+      cubriendo `deploy_version()` (crea objeto + fila en `SEMANTIC_VIEW_VERSIONS`),
       `activate_version()` (actualiza `SEMANTIC_VIEW_ACTIVE`, recrea el objeto físico desde
       `DDL_TEXT` si ya fue purgado) y `resolve_active()`; marcar `@pytest.mark.writes_db`. Debe
       **fallar** antes de T012.
@@ -106,9 +113,9 @@ una semantic view candidata con este mismo mecanismo).
       triggered_by, workflow_run_url) -> None` en
       `src/conversational_analytics/ops/deployments_log.py` (hace pasar el resto de T007;
       depende de T006, T010).
-- [X] T012 Implementar `deploy_version()`, `activate_version()` y `resolve_active()` en
-      `src/conversational_analytics/ops/semantic_view_registry.py`, con la convención de nombre
-      `<BASE_NAME>_V<sha_corto>` (hace pasar T008; depende de T006).
+- [X] T012 ⚠️ SUPERSEDED (ver Phase 10) Implementar `deploy_version()`, `activate_version()` y
+      `resolve_active()` en `src/conversational_analytics/ops/semantic_view_registry.py`, con la
+      convención de nombre `<BASE_NAME>_V<sha_corto>` (hace pasar T008; depende de T006).
 - [X] T013 Modificar `src/conversational_analytics/cortex_analyst.py` para resolver la semantic
       view con la precedencia env var → `resolve_active()` → constante por defecto (hace pasar
       T009; depende de T012).
@@ -125,7 +132,7 @@ una semantic view candidata con este mismo mecanismo).
 `pr-checks` falla y el merge queda bloqueado; corregir el test y comprobar que pasa y el merge se
 habilita (ver Escenario 1 de [quickstart.md](./quickstart.md)).
 
-- [X] T014 [US1] Implementar el modo `--candidate` de la CLI en
+- [X] T014 [US1] ⚠️ SUPERSEDED (ver Phase 10) Implementar el modo `--candidate` de la CLI en
       `src/conversational_analytics/ops/deploy.py`: invoca
       `semantic_view_registry.deploy_version(is_candidate=True, commit_sha=<sha de la PR>)` y
       escribe el `OBJECT_NAME` resultante en `$GITHUB_OUTPUT` (depende de T012). Además se añadió
@@ -254,6 +261,10 @@ tocar Snowflake (ver Escenario 5 de [quickstart.md](./quickstart.md)).
 
 ## Phase 7: User Story 5 - Volver atrás en la definición de una tabla semántica sin tocar Git (Priority: P3)
 
+> ⚠️ **Historia completa SUPERSEDED por [ADR-003](decisions/003-simplificacion-semantic-view.md)**
+> (ver Phase 10). Se conserva sin editar como registro histórico de lo que se construyó y por
+> qué se revirtió.
+
 **Goal**: Consultar y reactivar versiones anteriores de una semantic view sin `git reset` ni
 `git revert`, con una política de retención acotada.
 
@@ -261,18 +272,19 @@ tocar Snowflake (ver Escenario 5 de [quickstart.md](./quickstart.md)).
 historial y reactivar la anterior sin ejecutar ningún comando de Git (ver Escenario 6 de
 [quickstart.md](./quickstart.md)).
 
-- [X] T031 [US5] Extender `tests/test_ops_semantic_view_registry.py` con casos para
-      `cleanup_old_versions()`: conserva las `keep_last` versiones de producción más recientes,
-      nunca borra la versión activa, y no borra las filas de `SEMANTIC_VIEW_VERSIONS` (solo el
-      objeto físico). Debe **fallar** antes de T032.
-- [X] T032 [US5] Implementar `cleanup_old_versions(*, base_name, keep_last=5)` en
+- [X] T031 [US5] ⚠️ SUPERSEDED (ver Phase 10) Extender `tests/test_ops_semantic_view_registry.py`
+      con casos para `cleanup_old_versions()`: conserva las `keep_last` versiones de producción
+      más recientes, nunca borra la versión activa, y no borra las filas de
+      `SEMANTIC_VIEW_VERSIONS` (solo el objeto físico). Debe **fallar** antes de T032.
+- [X] T032 [US5] ⚠️ SUPERSEDED (ver Phase 10) Implementar
+      `cleanup_old_versions(*, base_name, keep_last=5)` en
       `src/conversational_analytics/ops/semantic_view_registry.py` (hace pasar T031; depende de
       T012).
-- [X] T033 [US5] Invocar `cleanup_old_versions()` al final del modo de release completa de
-      `ops/deploy.py` (depende de T019, T032).
-- [ ] T034 [US5] **Manual (requiere dos releases reales desplegadas)** Validar el Escenario 6 de
-      [quickstart.md](./quickstart.md): consultar `SEMANTIC_VIEW_VERSIONS`/`SHOW SEMANTIC VIEWS`
-      sin Git y reactivar una versión anterior.
+- [X] T033 [US5] ⚠️ SUPERSEDED (ver Phase 10) Invocar `cleanup_old_versions()` al final del modo
+      de release completa de `ops/deploy.py` (depende de T019, T032).
+- [ ] T034 [US5] ⚠️ SUPERSEDED (ver Phase 10) **Manual (requiere dos releases reales
+      desplegadas)** Validar el Escenario 6 de [quickstart.md](./quickstart.md): consultar
+      `SEMANTIC_VIEW_VERSIONS`/`SHOW SEMANTIC VIEWS` sin Git y reactivar una versión anterior.
 
 **Checkpoint**: Las 5 historias de usuario funcionan de forma independiente.
 
@@ -434,3 +446,69 @@ se distingue como incidente cuando el propio rollback automático falla.
       genérico de *drift* rutinario, per contracts/workflows.md (paso 8 de `deploy.yml`) / FR-011
       (partial). Implementado añadiendo `id: rollback` al paso de rollback y comprobando
       `steps.rollback.outcome == 'failure'` en el paso del Issue.
+
+---
+
+## Phase 10: Simplificación del versionado de semantic view (ADR-003)
+
+**Purpose**: revertir el mecanismo de versionado con puntero (`SEMANTIC_VIEW_VERSIONS` +
+`SEMANTIC_VIEW_ACTIVE`, User Story 5, modo `--candidate`) por duplicar a Git como fuente de
+verdad y por un bug real de mislabeling detectado al revisar `apply_release_artifacts` (leía
+`004_semantic_view.sql` del working tree actual en vez del commit objetivo en rollback/revert).
+Ver [ADR-003](decisions/003-simplificacion-semantic-view.md) para el detalle de la decisión.
+
+- [X] T042 [P] Eliminar `src/conversational_analytics/ops/semantic_view_registry.py`,
+      `snowflake/007_semantic_view_registry.sql` y
+      `tests/test_ops_semantic_view_registry.py`.
+- [X] T043 [P] Añadir `run_sql_string(sql_text: str) -> None` en
+      `src/conversational_analytics/ops/sql_runner.py` (ejecuta SQL ya en memoria) y refactorizar
+      `run_sql_file()` para que delegue en ella (lee el fichero y llama a `run_sql_string`).
+- [X] T044 Reescribir `src/conversational_analytics/ops/deploy.py`: nuevo helper
+      `_read_sql_at_commit(commit_sha, script_name) -> str` (usa `git show
+      <sha>:snowflake/<script>.sql`, sin tocar el working tree); `RELEASE_SQL_SCRIPTS` pasa a
+      incluir `004_semantic_view.sql` como script idempotente más; `apply_release_artifacts()`
+      reescrita para leer cada script vía `_read_sql_at_commit` y ejecutarlo con
+      `sql_runner.run_sql_string()`; `deploy_release()` pasa a devolver `None`; eliminados el modo
+      `--candidate`/`--drop-candidate` de `main()` y las constantes `BASE_NAME`/
+      `SEMANTIC_VIEW_DDL_PATH` (depende de T042, T043).
+- [X] T045 [P] Simplificar `src/conversational_analytics/cortex_analyst.py`:
+      `_resolve_semantic_view()` vuelve a la precedencia de 2 niveles
+      (`SNOWFLAKE_SEMANTIC_VIEW` env → `DEFAULT_SEMANTIC_VIEW`), sin `resolve_active()` (depende
+      de T042).
+- [X] T046 [P] Actualizar `tests/test_ops_deploy.py`: eliminar
+      `test_deploy_candidate_does_not_touch_deployments`; ajustar
+      `test_deploy_release_records_deploy_row_with_previous_sha` a que `deploy_release()` no
+      devuelve nada; añadir `test_apply_release_artifacts_reads_every_script_at_target_commit`
+      (mockea `_read_sql_at_commit`/`sql_runner.run_sql_string`, verifica una llamada por script
+      de `RELEASE_SQL_SCRIPTS`) (depende de T044).
+- [X] T047 [P] Reescribir `tests/test_cortex_analyst_resolves_active_view.py` con 2 tests
+      (override de env gana; por defecto sin override) en vez de los 4 anteriores basados en
+      `semantic_view_registry` (depende de T045).
+- [X] T048 Actualizar `.github/workflows/pr-checks.yml`: eliminar los pasos "Deploy candidate
+      semantic view" y "Drop candidate semantic view"; el paso de tests pasa a ejecutar `poetry
+      run pytest` directo contra la semantic view activa en producción, sin overrides ni
+      despliegue (depende de T044).
+- [X] T049 [P] Actualizar comentarios en `.github/workflows/deploy.yml` (paso 5) y
+      `.github/workflows/revert.yml` (comentario sobre `apply_release_artifacts`) para reflejar
+      la lectura vía `git show` en vez del registro de versiones en Snowflake (depende de T044).
+- [X] T050 [P] Actualizar documentación de diseño: `spec.md` (retirar US5/FR-016-018/020/
+      SC-006-007), `research.md` (D-04/05/06 → superseded), `data-model.md` (retirar entidades
+      `SemanticViewVersion`/`SemanticViewActive`), `contracts/semantic-view-versioning.md`
+      (reescritura completa), `contracts/workflows.md` (pr-checks/deploy/revert), `plan.md`
+      (Summary, Technical Context, Constitution Check, Project Structure, Complexity Tracking),
+      `quickstart.md` (retirar Escenario 6, ajustar Escenario 2 y 5), `README.md` (tabla CI/CD),
+      y crear `decisions/003-simplificacion-semantic-view.md` con la nota de "parcialmente
+      superseded" añadida a `decisions/001-estrategia-de-revert.md`.
+- [ ] T051 **Manual (requiere acceso a Snowflake con ACCOUNTADMIN o rol equivalente)** Limpiar
+      objetos obsoletos creados durante el desarrollo de US5 y de los tests `writes_db`: `DROP
+      TABLE IF EXISTS CICD_DEMO.DEVOPS.SEMANTIC_VIEW_VERSIONS;`, `DROP TABLE IF EXISTS
+      CICD_DEMO.DEVOPS.SEMANTIC_VIEW_ACTIVE;`, y `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA;`
+      para localizar y borrar cualquier objeto residual con sufijo `_V<sha>` o de prueba
+      (`SV_OPS_TEST*`, `SV_OPS_CLEANUP_*`).
+- [ ] T052 **Manual (requiere entorno GitHub configurado)** Re-ejecutar el guion completo de
+      [quickstart.md](./quickstart.md) (ya sin Escenario 6) para confirmar que la demo sigue
+      siendo válida de punta a punta tras la simplificación.
+
+**Checkpoint**: mecanismo de versionado con puntero eliminado; despliegue/rollback/revert basados
+en `git show`; toda la documentación y los workflows reflejan el diseño vigente.
+

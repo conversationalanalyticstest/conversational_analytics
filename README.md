@@ -96,8 +96,8 @@ manuales de configuración y guion de validación) en
 
 | Workflow | Se dispara | Qué hace |
 |---|---|---|
-| `.github/workflows/pr-checks.yml` | PR contra `main` | Despliega una semantic view candidata desechable y corre la suite contra ella; check requerido por la protección de rama |
-| `.github/workflows/deploy.yml` | push a `main` | Corre la suite, despliega una release versionada (`SV_..._V<sha_corto>`), evalúa post-deploy y hace rollback automático (forward-fix) si falla |
+| `.github/workflows/pr-checks.yml` | PR contra `main` | Corre la suite completa contra la semantic view activa en producción, sin desplegar nada; check requerido por la protección de rama |
+| `.github/workflows/deploy.yml` | push a `main` | Corre la suite, despliega la release (agente + semantic view, ambos in place), evalúa post-deploy y hace rollback automático (forward-fix) si falla |
 | `.github/workflows/revert.yml` | manual (`workflow_dispatch`) | Revierte a demanda a cualquier commit con un despliegue `SUCCESS` previo |
 
 Toda la lógica de despliegue/rollback/revert vive en `src/conversational_analytics/ops/`

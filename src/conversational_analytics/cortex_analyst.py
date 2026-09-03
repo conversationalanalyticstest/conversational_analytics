@@ -48,30 +48,16 @@ def _account_host() -> str:
 
 
 def _resolve_semantic_view() -> str:
-    """Resuelve la semantic view a consultar (feature 004-ci-cd-pipeline, FR-018).
+    """Resuelve la semantic view a consultar.
 
-    Precedencia (ver contracts/semantic-view-versioning.md):
-    1. `SNOWFLAKE_SEMANTIC_VIEW` en el entorno, si esta definida (comportamiento previo a esta
-       feature, sin cambios; lo usan `pr-checks.yml` para apuntar al objeto candidato y los
-       tests locales).
-    2. Si no: `ops.semantic_view_registry.resolve_active()`, el puntero de version activa.
-    3. Si el registro no tiene fila todavia (entorno recien creado, sin ningun despliegue
-       completo) o la consulta falla por cualquier motivo (p. ej. tablas `SEMANTIC_VIEW_*` aun
-       no desplegadas en local): `DEFAULT_SEMANTIC_VIEW`.
+    Precedencia (ver contracts/semantic-view-versioning.md, ADR-003):
+    1. `SNOWFLAKE_SEMANTIC_VIEW` en el entorno, si esta definida (override explicito para
+       desarrollo local y tests).
+    2. Si no: `DEFAULT_SEMANTIC_VIEW`. La semantic view es un unico objeto fisico, actualizado
+       siempre in place (`CREATE OR ALTER SEMANTIC VIEW`), sin mecanismo de versionado propio
+       en Snowflake.
     """
-    env_override = os.environ.get("SNOWFLAKE_SEMANTIC_VIEW")
-    if env_override:
-        return env_override
-
-    # Import local: no obligar a cargar `db.py` (y por tanto el conector de Snowflake) solo por
-    # importar este modulo, igual que hace `telemetry.SnowflakeTelemetry.record`.
-    from conversational_analytics.ops.semantic_view_registry import resolve_active
-
-    try:
-        object_name = resolve_active(base_name="SV_PHARMA_SALES")
-    except Exception:
-        return DEFAULT_SEMANTIC_VIEW
-    return f"CICD_DEMO.DATA.{object_name}"
+    return os.environ.get("SNOWFLAKE_SEMANTIC_VIEW") or DEFAULT_SEMANTIC_VIEW
 
 
 def generate_sql(question: str, *, timeout: float = DEFAULT_TIMEOUT) -> AnalystResult:

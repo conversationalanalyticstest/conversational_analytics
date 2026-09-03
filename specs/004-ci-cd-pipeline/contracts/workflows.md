@@ -12,8 +12,9 @@ fija el contrato que esa implementación MUST cumplir.
 
 **Disparador**: `pull_request` (`opened`, `synchronize`, `reopened`) contra `main`.
 
-**Permisos**: `contents: read` únicamente. No escribe en el repositorio ni en Snowflake más allá
-de un objeto candidato que él mismo limpia.
+**Permisos**: `contents: read` únicamente. No escribe en el repositorio ni despliega nada en
+Snowflake (ver [semantic-view-versioning.md](semantic-view-versioning.md), sección "PR checks:
+sin despliegue de candidato", ADR-003).
 
 **Secretos**: los mismos nombres que `.env.example` (`SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`,
 `SNOWFLAKE_PAT`, `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`,
@@ -28,17 +29,13 @@ falta esperarla).
 
 1. `actions/checkout` de la PR.
 2. `actions/setup-python` + `poetry install`.
-3. Desplegar semantic view **candidata** con
-   `poetry run python -m conversational_analytics.ops.deploy --candidate` (ver
-   [semantic-view-versioning.md](semantic-view-versioning.md)); captura `OBJECT_NAME` generado.
-4. Ejecutar la suite completa: `poetry run pytest`, con `SNOWFLAKE_SEMANTIC_VIEW` apuntando al
-   objeto candidato del paso 3.
-5. `if: always()` — borrar el objeto candidato (`DROP SEMANTIC VIEW IF EXISTS`).
-6. El resultado del paso 4 determina el estado del check `pr-checks` que GitHub usa como
+3. Ejecutar la suite completa: `poetry run pytest`, sin desplegar nada — corre contra la
+   semantic view activa en producción (ver ADR-003).
+4. El resultado del paso 3 determina el estado del check `pr-checks` que GitHub usa como
    *required status check* de la protección de rama (FR-002, FR-003).
 
-**Salida observable**: check `pr-checks` en verde/rojo sobre la PR; ningún cambio visible en
-`SEMANTIC_VIEW_ACTIVE` ni en `DEPLOYMENTS`.
+**Salida observable**: check `pr-checks` en verde/rojo sobre la PR; ningún cambio en Snowflake
+ni en `DEPLOYMENTS`.
 
 ---
 
@@ -65,8 +62,9 @@ simultáneos se serializan, nunca se solapan (FR-015).
    resumen del run) y el job termina en rojo. No se inserta fila en `DEPLOYMENTS` (no hubo
    intento de despliegue).
 5. Si pasa → `poetry run python -m conversational_analytics.ops.deploy` (release completa:
-   scripts idempotentes + nueva versión de semantic view + inserta `DEPLOYMENTS` con
-   `ACTION=DEPLOY`).
+   aplica los scripts SQL idempotentes de `snowflake/` tal como están en `github.sha` —
+   incluida `004_semantic_view.sql`, sobre el único objeto `SV_PHARMA_SALES` — e inserta
+   `DEPLOYMENTS` con `ACTION=DEPLOY`).
 6. Evaluación post-deploy: `poetry run pytest tests/test_agent_evaluation.py` contra el entorno
    ya desplegado (FR-009).
 7. Si el paso 6 pasa: mover el tag `deployed-good` a `github.sha`; marcar la fila del paso 5 como
@@ -78,9 +76,9 @@ simultáneos se serializan, nunca se solapan (FR-015).
 9. `if: always()` — recalcular drift (`deployed-good` vs `github.sha`) y crear/actualizar/cerrar
    el Issue con etiqueta `drift` (FR-021).
 
-**Salida observable**: `SEMANTIC_VIEW_ACTIVE` y el tag `deployed-good` reflejan la release
-realmente desplegada; `DEPLOYMENTS` tiene una fila nueva; el Issue `drift` existe solo si
-`main` y lo desplegado divergen.
+**Salida observable**: el tag `deployed-good` refleja la release realmente desplegada;
+`DEPLOYMENTS` tiene una fila nueva; el Issue `drift` existe solo si `main` y lo desplegado
+divergen.
 
 ---
 
@@ -102,8 +100,9 @@ se solapan).
    si no hay fila, el job falla inmediatamente con mensaje claro (FR-014), sin tocar Snowflake.
 2. Si es válido: `actions/checkout` de ese commit.
 3. Re-desplegar esa release (agente + semantic view) reutilizando la misma lógica de
-   `ops/deploy.py` que usa `deploy.yml`, apuntando `SEMANTIC_VIEW_ACTIVE` a la versión de ese
-   commit (recreándola desde `DDL_TEXT` si el objeto físico ya fue purgado por retención, D-06).
+   `ops/deploy.py` que usa `deploy.yml`: cada script SQL, incluida `004_semantic_view.sql`, se
+   lee con `git show <target_commit_sha>:snowflake/<script>.sql` (no del working tree) y se
+   aplica sobre el único objeto `SV_PHARMA_SALES` (ver ADR-003).
 4. Insertar fila en `DEPLOYMENTS` con `ACTION=MANUAL_REVERT`, `TRIGGERED_BY` = actor de GitHub
    que disparó el workflow (`github.actor`), `WORKFLOW_RUN_URL` (FR-013).
 5. `if: always()` — recalcular y actualizar el Issue de drift, igual que en `deploy.yml`.

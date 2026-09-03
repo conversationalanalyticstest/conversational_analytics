@@ -73,8 +73,9 @@ jobs:
       - name: Ejecutar suite completa contra el entorno vigente
         run: poetry run pytest
 
-      # Paso 5: release completa (scripts SQL idempotentes + nueva version de semantic view +
-      # fila DEPLOY en DEPLOYMENTS). No mueve el tag deployed-good todavia (ADR-002).
+      # Paso 5: release completa (scripts SQL idempotentes, incluida la semantic view actualizada
+      # in place con CREATE OR ALTER, ver ADR-003 + fila DEPLOY en DEPLOYMENTS). No mueve el tag
+      # deployed-good todavia (ADR-002).
       - name: Desplegar release completa
         run: poetry run python -m conversational_analytics.ops.deploy
 
