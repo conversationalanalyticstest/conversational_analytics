@@ -201,7 +201,9 @@ de [quickstart.md](./quickstart.md)).
       y si éste también falla, el job termina en rojo sin reintentar y marca el Issue de drift
       como incidente manual (FR-011).
 - [ ] T026 [US3] Validar manualmente el Escenario 3 de [quickstart.md](./quickstart.md): un fallo
-      post-deploy dispara el rollback automático y se abre el Issue `drift`.
+      post-deploy dispara el rollback automático y se abre el Issue `drift`; cronometrar que el
+      rollback completo tarda menos de 10 minutos (SC-003) y que el estado de drift se determina
+      en menos de 1 minuto mirando solo el Issue (SC-008).
 
 **Checkpoint**: User Stories 1-3 funcionan de forma independiente.
 
@@ -229,7 +231,8 @@ tocar Snowflake (ver Escenario 5 de [quickstart.md](./quickstart.md)).
       Environment `production`; pasos: validar (T028) → checkout del commit → re-desplegar →
       registrar → `if: always()` recalcular drift.
 - [ ] T030 [US4] Validar manualmente el Escenario 5 de [quickstart.md](./quickstart.md): revert
-      manual válido y rechazo de un SHA inventado.
+      manual válido y rechazo de un SHA inventado; cronometrar que el revert completo (una única
+      acción) tarda menos de 5 minutos (SC-004).
 
 **Checkpoint**: User Stories 1-4 funcionan de forma independiente.
 

@@ -65,6 +65,12 @@ SELECT ACTION, STATUS, REASON FROM CICD_DEMO.DEVOPS.DEPLOYMENTS ORDER BY DEPLOYE
 `deployed-good` vuelve a apuntar al commit anterior. Se abre un GitHub Issue con la etiqueta
 `drift` indicando que `main` está por delante de lo desplegado.
 
+**Cronometrar (SC-003, SC-008)**: apunta la hora a la que `deploy.yml` detecta el fallo de la
+evaluación post-deploy (inicio del job de rollback) y la hora en la que el rollback queda
+`SUCCESS` en `DEPLOYMENTS`; la diferencia MUST ser menor de 10 minutos. Por separado, cronometra
+cuánto tardas en determinar, mirando solo el Issue `drift` (sin revisar logs del pipeline), qué
+commits de `main` no están desplegados; MUST ser menor de 1 minuto.
+
 ## Escenario 4 — Resolver el drift con un fix forward
 
 Corregir el problema en un commit nuevo y mergearlo normalmente (Escenario 2). **Esperado**: el
@@ -80,6 +86,10 @@ release exitosa anterior (consultarlo con la query de
 
 Repetir con un SHA inventado (`target_commit_sha = 0000000`): el workflow **falla en el primer
 paso**, sin tocar Snowflake (FR-014).
+
+**Cronometrar (SC-004)**: desde que pulsas *Run workflow* hasta que `DEPLOYMENTS` registra la fila
+`MANUAL_REVERT` con `STATUS = 'SUCCESS'` MUST pasar menos de 5 minutos, y MUST ser una única
+acción (rellenar el input y confirmar), sin pasos manuales adicionales en Snowflake.
 
 ## Escenario 6 — Consultar y reactivar una versión de semantic view sin Git (User Story 5)
 
