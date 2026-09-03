@@ -1,0 +1,69 @@
+name: pr-checks
+
+# Contrato: specs/004-ci-cd-pipeline/contracts/workflows.md#pr-checksyml
+# Valida una PR contra main: despliega una semantic view candidata desechable (US1) y
+# ejecuta la suite completa contra ella. El check "pr-checks" es el required status check
+# de la proteccion de rama (FR-002, FR-003) — se configura a mano (tasks.md T003).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PAT: ${{ secrets.SNOWFLAKE_PAT }}
+  SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+  SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+  SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+  SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+  LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+  AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+  AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+  AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+  CORTEX_MODEL: ${{ secrets.CORTEX_MODEL }}
+
+jobs:
+  pr-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Deploy candidate semantic view
+        id: deploy_candidate
+        run: poetry run python -m conversational_analytics.ops.deploy --candidate
+
+      - name: Run test suite against candidate
+        env:
+          SNOWFLAKE_SEMANTIC_VIEW: CICD_DEMO.DATA.${{ steps.deploy_candidate.outputs.object_name }}
+        run: poetry run pytest
+
+      # if: always() -- se ejecuta tanto si la suite paso como si fallo, para no dejar
+      # objetos candidatos huerfanos en Snowflake (contrato paso 5).
+      - name: Drop candidate semantic view
+        if: always() && steps.deploy_candidate.outputs.object_name != ''
+        run: >
+          poetry run python -m conversational_analytics.ops.deploy
+          --drop-candidate ${{ steps.deploy_candidate.outputs.object_name }}

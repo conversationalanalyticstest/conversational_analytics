@@ -1,0 +1,100 @@
+name: revert
+
+# Contrato: specs/004-ci-cd-pipeline/contracts/workflows.md#revertyml
+# Revert manual a demanda (US4): cualquier miembro del equipo dispara este workflow con un
+# target_commit_sha que ya tuvo un despliegue SUCCESS registrado en DEPLOYMENTS. Un SHA
+# invalido se rechaza en el primer paso, sin tocar Snowflake (FR-014).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_commit_sha:
+        description: "Commit SHA al que revertir (debe tener un despliegue SUCCESS previo)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PAT: ${{ secrets.SNOWFLAKE_PAT }}
+  SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+  SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+  SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+  SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+  LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+  AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+  AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+  AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+  CORTEX_MODEL: ${{ secrets.CORTEX_MODEL }}
+
+jobs:
+  revert:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      # El checkout usa el sha por defecto del trigger manual (rama actual); ops/revert.py NO
+      # necesita que el workspace este en target_commit_sha para funcionar: re-despliega esa
+      # release aplicando los artefactos versionados en Snowflake (SEMANTIC_VIEW_VERSIONS +
+      # scripts SQL idempotentes de este checkout), no un `git checkout` del commit antiguo.
+      - name: Checkout (historial y tags completos)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      # Paso 1 del contrato: valida target_commit_sha contra DEPLOYMENTS antes de tocar
+      # Snowflake (FR-014); re-despliega esa release y registra ACTION=MANUAL_REVERT (pasos
+      # 2-4). Si el SHA es invalido, ops/revert.py devuelve exit code 1 y el job termina en
+      # rojo aqui mismo, sin ejecutar nada mas.
+      - name: Revertir a la release indicada
+        run: >
+          poetry run python -m conversational_analytics.ops.revert
+          --target "${{ inputs.target_commit_sha }}"
+
+      # Paso 5: siempre, recalcular drift y reflejarlo en el Issue, igual que en deploy.yml.
+      - name: Calcular drift (deployed-good vs HEAD de main)
+        id: drift
+        if: always()
+        run: poetry run python -m conversational_analytics.ops.drift --head-sha "$GITHUB_SHA"
+
+      - name: Crear / actualizar / cerrar el Issue de drift
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label drift --state open \
+            --json number -q '.[0].number // empty')
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ "${{ steps.drift.outputs.has_drift }}" = "true" ]; then
+            body="main esta en \`${{ steps.drift.outputs.head_sha }}\` pero lo desplegado en Snowflake es \`${{ steps.drift.outputs.deployed_sha }}\` (tras revert manual a \`${{ inputs.target_commit_sha }}\`). Run: $run_url"
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" \
+                --title "Drift: main por delante de lo desplegado en Snowflake" \
+                --label drift --body "$body"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+              --comment "Resuelto: lo desplegado ya coincide con main (\`${{ steps.drift.outputs.head_sha }}\`). Run: $run_url"
+          fi

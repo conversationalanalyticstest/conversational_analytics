@@ -1,0 +1,133 @@
+name: deploy
+
+# Contrato: specs/004-ci-cd-pipeline/contracts/workflows.md#deployyml
+# Cada push a main (cada merge) re-ejecuta la suite completa; si pasa, despliega una release
+# completa con SHA identificable (US2). Si la evaluacion post-deploy falla, se hace rollback
+# automatico a la ultima release buena conocida (US3, forward-fix, ADR-002). Al final, siempre
+# se recalcula el estado de drift entre main y lo realmente desplegado (FR-021/FR-022).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PAT: ${{ secrets.SNOWFLAKE_PAT }}
+  SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+  SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+  SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+  SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+  LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+  AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+  AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+  AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+  CORTEX_MODEL: ${{ secrets.CORTEX_MODEL }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout main (historial y tags completos)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      # Paso 2 del contrato: aviso no bloqueante si ya habia un incidente de drift abierto
+      # de un run anterior (FR-022) — no impide continuar con este deploy.
+      - name: Avisar si ya habia drift antes de este deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label drift --state open \
+            --json number -q '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "### :warning: Ya habia un incidente de drift abierto: #$existing" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Paso 4 del contrato: si la suite falla aqui, ningun paso posterior de despliegue se
+      # ejecuta (comportamiento por defecto de un step sin "if") — no se inserta fila en
+      # DEPLOYMENTS porque no hubo intento de despliegue (FR-006).
+      - name: Ejecutar suite completa contra el entorno vigente
+        run: poetry run pytest
+
+      # Paso 5: release completa (scripts SQL idempotentes + nueva version de semantic view +
+      # fila DEPLOY en DEPLOYMENTS). No mueve el tag deployed-good todavia (ADR-002).
+      - name: Desplegar release completa
+        run: poetry run python -m conversational_analytics.ops.deploy
+
+      # Paso 6: evaluacion post-deploy contra el entorno ya desplegado. continue-on-error para
+      # poder decidir a continuacion si confirmar el tag o disparar el rollback (US3).
+      - name: Evaluacion post-deploy
+        id: post_deploy_eval
+        continue-on-error: true
+        run: poetry run pytest tests/test_agent_evaluation.py
+
+      # Paso 7: evaluacion en verde -> confirmar deployed-good en este commit.
+      - name: Confirmar release (mover tag deployed-good)
+        if: steps.post_deploy_eval.outcome == 'success'
+        run: poetry run python -m conversational_analytics.ops.deploy --confirm "$GITHUB_SHA"
+
+      # Paso 8: evaluacion en rojo -> forward-fix a la ultima release buena conocida. Si el
+      # propio rollback falla, este step termina el job en rojo sin reintentar (FR-011).
+      - name: Rollback automatico (forward-fix)
+        if: steps.post_deploy_eval.outcome == 'failure'
+        run: poetry run python -m conversational_analytics.ops.rollback --failed-sha "$GITHUB_SHA"
+
+      # El commit de este run no queda desplegado aunque el rollback tenga exito: el job MUST
+      # reflejar que este deploy en concreto fallo (el forward-fix ya dejo Snowflake sano).
+      - name: Marcar el job en rojo tras un rollback automatico
+        if: steps.post_deploy_eval.outcome == 'failure'
+        run: |
+          echo "::error::La evaluacion post-deploy fallo; se hizo rollback automatico a la ultima release buena." >&2
+          exit 1
+
+      # Paso 9: siempre, pase lo que pase arriba, recalcular drift y reflejarlo en un Issue.
+      - name: Calcular drift (deployed-good vs HEAD de main)
+        id: drift
+        if: always()
+        run: poetry run python -m conversational_analytics.ops.drift --head-sha "$GITHUB_SHA"
+
+      - name: Crear / actualizar / cerrar el Issue de drift
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label drift --state open \
+            --json number -q '.[0].number // empty')
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ "${{ steps.drift.outputs.has_drift }}" = "true" ]; then
+            body="main esta en \`${{ steps.drift.outputs.head_sha }}\` pero lo desplegado en Snowflake es \`${{ steps.drift.outputs.deployed_sha }}\`. Run: $run_url"
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" \
+                --title "Drift: main por delante de lo desplegado en Snowflake" \
+                --label drift --body "$body"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+              --comment "Resuelto: lo desplegado ya coincide con main (\`${{ steps.drift.outputs.head_sha }}\`). Run: $run_url"
+          fi

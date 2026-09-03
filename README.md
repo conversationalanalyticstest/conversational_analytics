@@ -87,6 +87,23 @@ proveedor/modelo, tokens, coste estimado, latencia y estado) — ver
 [snowflake/005_telemetry.sql](snowflake/005_telemetry.sql) y
 [snowflake/README.md](snowflake/README.md).
 
+## CI/CD
+
+Cada cambio a `main` pasa por una pipeline de GitHub Actions con protección de rama, despliegue
+versionado a Snowflake y rollback automático. Detalle completo (arquitectura, ADRs, pasos
+manuales de configuración y guion de validación) en
+[specs/004-ci-cd-pipeline/quickstart.md](specs/004-ci-cd-pipeline/quickstart.md).
+
+| Workflow | Se dispara | Qué hace |
+|---|---|---|
+| `.github/workflows/pr-checks.yml` | PR contra `main` | Despliega una semantic view candidata desechable y corre la suite contra ella; check requerido por la protección de rama |
+| `.github/workflows/deploy.yml` | push a `main` | Corre la suite, despliega una release versionada (`SV_..._V<sha_corto>`), evalúa post-deploy y hace rollback automático (forward-fix) si falla |
+| `.github/workflows/revert.yml` | manual (`workflow_dispatch`) | Revierte a demanda a cualquier commit con un despliegue `SUCCESS` previo |
+
+Toda la lógica de despliegue/rollback/revert vive en `src/conversational_analytics/ops/`
+(módulos testeados con `pytest`); los workflows son orquestación fina que invoca
+`poetry run python -m conversational_analytics.ops.<módulo>`.
+
 ## Estructura
 
 ```

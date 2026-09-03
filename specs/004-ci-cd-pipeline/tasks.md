@@ -51,17 +51,21 @@ Proyecto único (ver "Project Structure" en [plan.md](./plan.md)):
 **Purpose**: Dejar listas las condiciones del repositorio y de GitHub que ningún test puede
 verificar por sí solo.
 
-- [ ] T001 [P] Crear el subpaquete `src/conversational_analytics/ops/__init__.py` (vacío, solo
+- [X] T001 [P] Crear el subpaquete `src/conversational_analytics/ops/__init__.py` (vacío, solo
       para que `ops` sea un paquete importable y que `pytest` lo recoja).
-- [ ] T002 [P] Crear en GitHub el Environment `production` con protección de revisión y añadir en
-      él los secretos listados en la sección "Prerrequisitos" de
-      [quickstart.md](./quickstart.md) (`SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PAT`,
-      `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`, `LLM_PROVIDER`,
-      `OPENAI_API_KEY`); duplicar los mismos nombres como secretos de **repositorio** (sin
-      Environment) para que `pr-checks.yml` pueda leerlos.
-- [ ] T003 Configurar la protección de rama de `main` en GitHub: PR obligatoria, check
-      `pr-checks` marcado como *required status check*, mínimo 1 aprobación, sin push directo
-      (FR-001, FR-004); seguir la sección "Prerrequisitos" de [quickstart.md](./quickstart.md).
+- [ ] T002 [P] **Manual (GitHub, requiere al usuario)** Crear en GitHub el Environment
+      `production` con protección de revisión y añadir en él los secretos listados en la
+      sección "Prerrequisitos" de [quickstart.md](./quickstart.md) (`SNOWFLAKE_ACCOUNT`,
+      `SNOWFLAKE_USER`, `SNOWFLAKE_PAT`, `SNOWFLAKE_ROLE`, `SNOWFLAKE_WAREHOUSE`,
+      `SNOWFLAKE_DATABASE`, `LLM_PROVIDER`, `OPENAI_API_KEY`); duplicar los mismos nombres como
+      secretos de **repositorio** (sin Environment) para que `pr-checks.yml` pueda leerlos.
+      También crear la etiqueta (`label`) `drift` en el repositorio — la necesitan
+      `deploy.yml`/`revert.yml` para `gh issue create --label drift` y no está cubierta por
+      `quickstart.md`.
+- [ ] T003 **Manual (GitHub, requiere al usuario)** Configurar la protección de rama de `main`
+      en GitHub: PR obligatoria, check `pr-checks` marcado como *required status check*, mínimo
+      1 aprobación, sin push directo (FR-001, FR-004); seguir la sección "Prerrequisitos" de
+      [quickstart.md](./quickstart.md).
 
 **Checkpoint**: el repositorio está listo para recibir los workflows; ningún cambio de código
 todavía.
@@ -76,36 +80,36 @@ una semantic view candidata con este mismo mecanismo).
 
 **⚠️ CRITICAL**: Ninguna historia de usuario puede completarse hasta que esta fase termine.
 
-- [ ] T004 [P] Crear `snowflake/006_deployments.sql` con el DDL de `DEPLOYMENTS`
+- [X] T004 [P] Crear `snowflake/006_deployments.sql` con el DDL de `DEPLOYMENTS`
       (`CREATE TABLE IF NOT EXISTS`, ver [contracts/deployments-table.md](contracts/deployments-table.md)).
-- [ ] T005 [P] Crear `snowflake/007_semantic_view_registry.sql` con el DDL de
+- [X] T005 [P] Crear `snowflake/007_semantic_view_registry.sql` con el DDL de
       `SEMANTIC_VIEW_VERSIONS` y `SEMANTIC_VIEW_ACTIVE`
       (ver [contracts/semantic-view-versioning.md](contracts/semantic-view-versioning.md)).
-- [ ] T006 Ejecutar `006_deployments.sql` y `007_semantic_view_registry.sql` contra Snowflake (una
+- [X] T006 Ejecutar `006_deployments.sql` y `007_semantic_view_registry.sql` contra Snowflake (una
       vez, igual que `001_bootstrap.sql`..`005_telemetry.sql`) y verificar con
       `SHOW TABLES IN SCHEMA CICD_DEMO.DEVOPS;` que las 3 tablas existen (depende de T004, T005).
-- [ ] T007 [P] Escribir `tests/test_ops_deploy.py` cubriendo `ops.sql_runner.run_sql_file()`
+- [X] T007 [P] Escribir `tests/test_ops_deploy.py` cubriendo `ops.sql_runner.run_sql_file()`
       (aplica un `.sql` de prueba idempotente) y `ops.deployments_log.record()` (inserta una fila
       y se puede releer); marcar con `@pytest.mark.writes_db`. Debe **fallar** antes de T010/T011.
-- [ ] T008 [P] Escribir `tests/test_ops_semantic_view_registry.py` cubriendo
+- [X] T008 [P] Escribir `tests/test_ops_semantic_view_registry.py` cubriendo
       `deploy_version()` (crea objeto + fila en `SEMANTIC_VIEW_VERSIONS`),
       `activate_version()` (actualiza `SEMANTIC_VIEW_ACTIVE`, recrea el objeto físico desde
       `DDL_TEXT` si ya fue purgado) y `resolve_active()`; marcar `@pytest.mark.writes_db`. Debe
       **fallar** antes de T012.
-- [ ] T009 [P] Escribir `tests/test_cortex_analyst_resolves_active_view.py` cubriendo la
+- [X] T009 [P] Escribir `tests/test_cortex_analyst_resolves_active_view.py` cubriendo la
       precedencia: `SNOWFLAKE_SEMANTIC_VIEW` (env) > `resolve_active()` > `DEFAULT_SEMANTIC_VIEW`.
       Debe **fallar** antes de T013.
-- [ ] T010 [P] Implementar `run_sql_file(path: Path) -> None` en
+- [X] T010 [P] Implementar `run_sql_file(path: Path) -> None` en
       `src/conversational_analytics/ops/sql_runner.py` usando `db.get_connection()` +
       `conn.execute_string()` (hace pasar la parte de T007 correspondiente).
-- [ ] T011 Implementar `record(*, action, target_commit_sha, previous_commit_sha, status, reason,
+- [X] T011 Implementar `record(*, action, target_commit_sha, previous_commit_sha, status, reason,
       triggered_by, workflow_run_url) -> None` en
       `src/conversational_analytics/ops/deployments_log.py` (hace pasar el resto de T007;
       depende de T006, T010).
-- [ ] T012 Implementar `deploy_version()`, `activate_version()` y `resolve_active()` en
+- [X] T012 Implementar `deploy_version()`, `activate_version()` y `resolve_active()` en
       `src/conversational_analytics/ops/semantic_view_registry.py`, con la convención de nombre
       `<BASE_NAME>_V<sha_corto>` (hace pasar T008; depende de T006).
-- [ ] T013 Modificar `src/conversational_analytics/cortex_analyst.py` para resolver la semantic
+- [X] T013 Modificar `src/conversational_analytics/cortex_analyst.py` para resolver la semantic
       view con la precedencia env var → `resolve_active()` → constante por defecto (hace pasar
       T009; depende de T012).
 
@@ -121,18 +125,21 @@ una semantic view candidata con este mismo mecanismo).
 `pr-checks` falla y el merge queda bloqueado; corregir el test y comprobar que pasa y el merge se
 habilita (ver Escenario 1 de [quickstart.md](./quickstart.md)).
 
-- [ ] T014 [US1] Implementar el modo `--candidate` de la CLI en
+- [X] T014 [US1] Implementar el modo `--candidate` de la CLI en
       `src/conversational_analytics/ops/deploy.py`: invoca
       `semantic_view_registry.deploy_version(is_candidate=True, commit_sha=<sha de la PR>)` y
-      escribe el `OBJECT_NAME` resultante en `$GITHUB_OUTPUT` (depende de T012).
-- [ ] T015 [US1] Crear `.github/workflows/pr-checks.yml` según
+      escribe el `OBJECT_NAME` resultante en `$GITHUB_OUTPUT` (depende de T012). Además se añadió
+      `--drop-candidate OBJECT_NAME` (no estaba en el plan original de esta tarea, pero es
+      necesario para el paso de limpieza de T015; ver `semantic_view_registry.drop_candidate()`).
+- [X] T015 [US1] Crear `.github/workflows/pr-checks.yml` según
       [contracts/workflows.md](contracts/workflows.md): trigger `pull_request` contra `main`,
       `permissions: contents: read`, `concurrency` con `cancel-in-progress: true`; pasos:
       checkout → setup-python + `poetry install` → desplegar candidata (T014) → `poetry run
       pytest` con `SNOWFLAKE_SEMANTIC_VIEW` apuntando al objeto candidato → `if: always()` DROP
       del objeto candidato.
-- [ ] T016 [US1] Validar manualmente el Escenario 1 de [quickstart.md](./quickstart.md): PR con
-      test roto bloquea el merge; PR corregida lo habilita.
+- [ ] T016 [US1] **Manual (requiere PR real en GitHub)** Validar el Escenario 1 de
+      [quickstart.md](./quickstart.md): PR con test roto bloquea el merge; PR corregida lo
+      habilita. Pendiente de T002/T003.
 
 **Checkpoint**: User Story 1 funcional de forma independiente.
 
@@ -147,22 +154,24 @@ identificable; si falla, no despliega nada.
 quedan con el nuevo commit SHA; forzar un fallo post-merge y comprobar que Snowflake no cambia
 (ver Escenario 2 de [quickstart.md](./quickstart.md)).
 
-- [ ] T017 [US2] Extender `tests/test_ops_deploy.py` con el modo de release completa: aplica los
+- [X] T017 [US2] Extender `tests/test_ops_deploy.py` con el modo de release completa: aplica los
       scripts SQL vía `sql_runner`, llama `deploy_version(is_candidate=False)` +
       `activate_version()`, inserta en `DEPLOYMENTS` con `ACTION=DEPLOY`. Debe **fallar** antes de
       T019.
-- [ ] T018 [US2] Escribir `tests/test_ops_drift.py`: dado un `deployed_sha` y un `head_sha` de
+- [X] T018 [US2] Escribir `tests/test_ops_drift.py`: dado un `deployed_sha` y un `head_sha` de
       ejemplo (sin tocar Snowflake ni Git real), verifica la lógica de comparación que determina
       si hay *drift*. Debe **fallar** antes de T020.
-- [ ] T019 [US2] Implementar el modo de release completa (sin `--candidate`) en
+- [X] T019 [US2] Implementar el modo de release completa (sin `--candidate`) en
       `src/conversational_analytics/ops/deploy.py`: aplica `snowflake/*.sql` idempotentes vía
       `sql_runner.run_sql_file()`, despliega y activa la versión de semantic view, registra la
-      fila en `DEPLOYMENTS` vía `deployments_log.record()`, y mueve el tag Git `deployed-good` al
-      commit desplegado (hace pasar T017; depende de T010-T013).
-- [ ] T020 [US2] Implementar `src/conversational_analytics/ops/drift.py` con una función pura de
+      fila en `DEPLOYMENTS` vía `deployments_log.record()`. **Desviación del ADR-002**: el tag
+      Git `deployed-good` NO se mueve aquí, sino en un paso `--confirm` separado que solo se
+      ejecuta si la evaluación post-deploy pasa (ver T021) — así el tag nunca apunta a una
+      release que falló su propia evaluación (hace pasar T017; depende de T010-T013).
+- [X] T020 [US2] Implementar `src/conversational_analytics/ops/drift.py` con una función pura de
       comparación de SHAs (`deployed-good` vs HEAD de `main`) que no requiere credenciales de
       Snowflake (hace pasar T018).
-- [ ] T021 [US2] Crear `.github/workflows/deploy.yml` según
+- [X] T021 [US2] Crear `.github/workflows/deploy.yml` según
       [contracts/workflows.md](contracts/workflows.md): trigger `push` a `main`,
       `permissions: contents: write, issues: write`, `concurrency: deploy-production` con
       `cancel-in-progress: false`; pasos: checkout → aviso de drift previo (si existe, FR-022) →
@@ -170,9 +179,9 @@ quedan con el nuevo commit SHA; forzar un fallo post-merge y comprobar que Snowf
       post-deploy (`pytest tests/test_agent_evaluation.py` contra lo ya desplegado) → si pasa,
       confirmar tag `deployed-good` → `if: always()` recalcular drift (T020) y
       crear/actualizar/cerrar Issue `drift`.
-- [ ] T022 [US2] Validar manualmente el Escenario 2 de [quickstart.md](./quickstart.md): el merge
-      despliega y el SHA queda identificable en `DEPLOYMENTS`, `SEMANTIC_VIEW_ACTIVE` y el tag
-      `deployed-good`.
+- [ ] T022 [US2] **Manual (requiere merge real en GitHub)** Validar el Escenario 2 de
+      [quickstart.md](./quickstart.md): el merge despliega y el SHA queda identificable en
+      `DEPLOYMENTS`, `SEMANTIC_VIEW_ACTIVE` y el tag `deployed-good`. Pendiente de T002/T003.
 
 **Checkpoint**: User Stories 1 y 2 funcionan de forma independiente — **MVP completo**: una PR
 rota no mergea, una PR válida despliega con trazabilidad de SHA.
@@ -188,22 +197,23 @@ release buena, sin intervención manual.
 comprobar que, sin intervención manual, Snowflake vuelve al commit SHA anterior (ver Escenario 3
 de [quickstart.md](./quickstart.md)).
 
-- [ ] T023 [US3] Escribir `tests/test_ops_rollback.py`: dado un historial de `DEPLOYMENTS` con una
+- [X] T023 [US3] Escribir `tests/test_ops_rollback.py`: dado un historial de `DEPLOYMENTS` con una
       release buena anterior, verifica que se localiza correctamente y que se re-invoca el
       despliegue de esa release; y que si el propio rollback falla, no reintenta indefinidamente
       (FR-011). Debe **fallar** antes de T024.
-- [ ] T024 [US3] Implementar `src/conversational_analytics/ops/rollback.py`: lee el tag Git
+- [X] T024 [US3] Implementar `src/conversational_analytics/ops/rollback.py`: lee el tag Git
       `deployed-good` (o, si no coincide, la última fila `SUCCESS` de `DEPLOYMENTS`), re-invoca la
       lógica de `ops/deploy.py` para esa release, y registra la fila con
       `ACTION=AUTO_ROLLBACK` (hace pasar T023; depende de T019).
-- [ ] T025 [US3] Añadir a `.github/workflows/deploy.yml` el paso/job de rollback automático:
+- [X] T025 [US3] Añadir a `.github/workflows/deploy.yml` el paso/job de rollback automático:
       disparado cuando la evaluación post-deploy (paso de T021) falla, invoca `ops/rollback.py`,
       y si éste también falla, el job termina en rojo sin reintentar y marca el Issue de drift
       como incidente manual (FR-011).
-- [ ] T026 [US3] Validar manualmente el Escenario 3 de [quickstart.md](./quickstart.md): un fallo
-      post-deploy dispara el rollback automático y se abre el Issue `drift`; cronometrar que el
-      rollback completo tarda menos de 10 minutos (SC-003) y que el estado de drift se determina
-      en menos de 1 minuto mirando solo el Issue (SC-008).
+- [ ] T026 [US3] **Manual (requiere disparar un deploy real que falle en GitHub)** Validar el
+      Escenario 3 de [quickstart.md](./quickstart.md): un fallo post-deploy dispara el rollback
+      automático y se abre el Issue `drift`; cronometrar que el rollback completo tarda menos de
+      10 minutos (SC-003) y que el estado de drift se determina en menos de 1 minuto mirando solo
+      el Issue (SC-008). Pendiente de T002/T003 y de la etiqueta `drift`.
 
 **Checkpoint**: User Stories 1-3 funcionan de forma independiente.
 
@@ -218,21 +228,25 @@ de [quickstart.md](./quickstart.md)).
 comprobar que Snowflake queda en el estado de esa release; y que un SHA inválido se rechaza sin
 tocar Snowflake (ver Escenario 5 de [quickstart.md](./quickstart.md)).
 
-- [ ] T027 [US4] Escribir `tests/test_ops_revert.py`: un `target_commit_sha` sin fila
+- [X] T027 [US4] Escribir `tests/test_ops_revert.py`: un `target_commit_sha` sin fila
       `STATUS='SUCCESS'` en `DEPLOYMENTS` se rechaza **antes** de tocar Snowflake (FR-014); un
       `target_commit_sha` válido re-despliega esa release y registra la fila con
       `ACTION=MANUAL_REVERT`. Debe **fallar** antes de T028.
-- [ ] T028 [US4] Implementar `src/conversational_analytics/ops/revert.py`: valida
+- [X] T028 [US4] Implementar `src/conversational_analytics/ops/revert.py`: valida
       `target_commit_sha` contra `DEPLOYMENTS`, re-invoca la lógica de `ops/deploy.py` para esa
       release, registra `TRIGGERED_BY` = actor de GitHub (hace pasar T027; depende de T019).
-- [ ] T029 [US4] Crear `.github/workflows/revert.yml` según
+- [X] T029 [US4] Crear `.github/workflows/revert.yml` según
       [contracts/workflows.md](contracts/workflows.md): `workflow_dispatch` con input
       `target_commit_sha`, mismo `concurrency: deploy-production` que `deploy.yml`, mismo
-      Environment `production`; pasos: validar (T028) → checkout del commit → re-desplegar →
-      registrar → `if: always()` recalcular drift.
-- [ ] T030 [US4] Validar manualmente el Escenario 5 de [quickstart.md](./quickstart.md): revert
-      manual válido y rechazo de un SHA inventado; cronometrar que el revert completo (una única
-      acción) tarda menos de 5 minutos (SC-004).
+      Environment `production`; pasos: validar (T028) → checkout → re-desplegar → registrar →
+      `if: always()` recalcular drift. **Nota**: el checkout no cambia al commit histórico (el
+      workspace se queda en la rama que disparó el `workflow_dispatch`); `ops/revert.py`
+      re-aplica esa release reconstruyendo el objeto de semantic view desde `DDL_TEXT` guardado
+      en `SEMANTIC_VIEW_VERSIONS`, no desde ficheros del checkout de ese commit antiguo.
+- [ ] T030 [US4] **Manual (requiere disparar `workflow_dispatch` real en GitHub)** Validar el
+      Escenario 5 de [quickstart.md](./quickstart.md): revert manual válido y rechazo de un SHA
+      inventado; cronometrar que el revert completo (una única acción) tarda menos de 5 minutos
+      (SC-004). Pendiente de T002/T003.
 
 **Checkpoint**: User Stories 1-4 funcionan de forma independiente.
 
@@ -247,17 +261,18 @@ tocar Snowflake (ver Escenario 5 de [quickstart.md](./quickstart.md)).
 historial y reactivar la anterior sin ejecutar ningún comando de Git (ver Escenario 6 de
 [quickstart.md](./quickstart.md)).
 
-- [ ] T031 [US5] Extender `tests/test_ops_semantic_view_registry.py` con casos para
+- [X] T031 [US5] Extender `tests/test_ops_semantic_view_registry.py` con casos para
       `cleanup_old_versions()`: conserva las `keep_last` versiones de producción más recientes,
       nunca borra la versión activa, y no borra las filas de `SEMANTIC_VIEW_VERSIONS` (solo el
       objeto físico). Debe **fallar** antes de T032.
-- [ ] T032 [US5] Implementar `cleanup_old_versions(*, base_name, keep_last=5)` en
+- [X] T032 [US5] Implementar `cleanup_old_versions(*, base_name, keep_last=5)` en
       `src/conversational_analytics/ops/semantic_view_registry.py` (hace pasar T031; depende de
       T012).
-- [ ] T033 [US5] Invocar `cleanup_old_versions()` al final del modo de release completa de
+- [X] T033 [US5] Invocar `cleanup_old_versions()` al final del modo de release completa de
       `ops/deploy.py` (depende de T019, T032).
-- [ ] T034 [US5] Validar manualmente el Escenario 6 de [quickstart.md](./quickstart.md): consultar
-      `SEMANTIC_VIEW_VERSIONS`/`SHOW SEMANTIC VIEWS` sin Git y reactivar una versión anterior.
+- [ ] T034 [US5] **Manual (requiere dos releases reales desplegadas)** Validar el Escenario 6 de
+      [quickstart.md](./quickstart.md): consultar `SEMANTIC_VIEW_VERSIONS`/`SHOW SEMANTIC VIEWS`
+      sin Git y reactivar una versión anterior.
 
 **Checkpoint**: Las 5 historias de usuario funcionan de forma independiente.
 
@@ -267,13 +282,16 @@ historial y reactivar la anterior sin ejecutar ningún comando de Git (ver Escen
 
 **Purpose**: Cierre de la feature completa.
 
-- [ ] T035 [P] Añadir al [README.md](../../README.md) una sección breve de CI/CD (los 3
+- [X] T035 [P] Añadir al [README.md](../../README.md) una sección breve de CI/CD (los 3
       workflows, enlace a [quickstart.md](./quickstart.md)).
-- [ ] T036 Revisar los 3 workflows (`.github/workflows/*.yml`) para confirmar que ningún secreto
+- [X] T036 Revisar los 3 workflows (`.github/workflows/*.yml`) para confirmar que ningún secreto
       se imprime en logs (p. ej. `echo` de variables de entorno, salida de `pytest -v` con datos
-      sensibles).
-- [ ] T037 Ejecutar de punta a punta los 6 escenarios de [quickstart.md](./quickstart.md) en
-      orden, sin saltarse ninguno, como validación final de la feature completa.
+      sensibles). Revisión hecha: ningún workflow hace `echo`/`print` de un secreto ni activa
+      `set -x`; los únicos valores volcados a `$GITHUB_STEP_SUMMARY`/Issues son SHAs y números de
+      Issue, no credenciales.
+- [ ] T037 **Manual (requiere entorno GitHub configurado, T002/T003)** Ejecutar de punta a punta
+      los 6 escenarios de [quickstart.md](./quickstart.md) en orden, sin saltarse ninguno, como
+      validación final de la feature completa.
 
 ---
 

@@ -47,6 +47,33 @@ def _account_host() -> str:
     return f"https://{account}.snowflakecomputing.com"
 
 
+def _resolve_semantic_view() -> str:
+    """Resuelve la semantic view a consultar (feature 004-ci-cd-pipeline, FR-018).
+
+    Precedencia (ver contracts/semantic-view-versioning.md):
+    1. `SNOWFLAKE_SEMANTIC_VIEW` en el entorno, si esta definida (comportamiento previo a esta
+       feature, sin cambios; lo usan `pr-checks.yml` para apuntar al objeto candidato y los
+       tests locales).
+    2. Si no: `ops.semantic_view_registry.resolve_active()`, el puntero de version activa.
+    3. Si el registro no tiene fila todavia (entorno recien creado, sin ningun despliegue
+       completo) o la consulta falla por cualquier motivo (p. ej. tablas `SEMANTIC_VIEW_*` aun
+       no desplegadas en local): `DEFAULT_SEMANTIC_VIEW`.
+    """
+    env_override = os.environ.get("SNOWFLAKE_SEMANTIC_VIEW")
+    if env_override:
+        return env_override
+
+    # Import local: no obligar a cargar `db.py` (y por tanto el conector de Snowflake) solo por
+    # importar este modulo, igual que hace `telemetry.SnowflakeTelemetry.record`.
+    from conversational_analytics.ops.semantic_view_registry import resolve_active
+
+    try:
+        object_name = resolve_active(base_name="SV_PHARMA_SALES")
+    except Exception:
+        return DEFAULT_SEMANTIC_VIEW
+    return f"CICD_DEMO.DATA.{object_name}"
+
+
 def generate_sql(question: str, *, timeout: float = DEFAULT_TIMEOUT) -> AnalystResult:
     """Traduce una pregunta en lenguaje natural a SQL usando Cortex Analyst.
 
@@ -62,7 +89,7 @@ def generate_sql(question: str, *, timeout: float = DEFAULT_TIMEOUT) -> AnalystR
     Raises:
         CortexAnalystError: timeout, o la API REST devuelve 401/403/400/otro fallo de servicio.
     """
-    semantic_view = os.environ.get("SNOWFLAKE_SEMANTIC_VIEW", DEFAULT_SEMANTIC_VIEW)
+    semantic_view = _resolve_semantic_view()
     url = f"{_account_host()}/api/v2/cortex/analyst/message"
     headers = {
         "Authorization": f"Bearer {os.environ['SNOWFLAKE_PAT']}",
