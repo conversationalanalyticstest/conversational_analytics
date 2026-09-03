@@ -46,7 +46,12 @@ def test_ask_is_stateless() -> None:
     La comparación se hace sobre los *valores* de cada fila, no sobre los nombres de
     columna: Cortex Analyst genera SQL libre para esta pregunta (sin verified query que
     la cubra) y puede usar un alias distinto para la misma columna en cada invocación
-    (p. ej. `UNITS` vs `UNITS_SOLD`) sin que eso implique contaminación de estado.
+    (p. ej. `UNITS` vs `UNITS_SOLD`), o incluso proyectar las mismas columnas en distinto
+    orden (`SELECT pais, unidades` vs `SELECT unidades, pais`), sin que eso implique
+    contaminación de estado. Por eso los valores de cada fila se ordenan (por `repr`, para
+    poder comparar tipos mixtos como `str`/`int`/`Decimal` sin que Python falle al
+    ordenarlos entre sí) antes de comparar: así solo importa el *multiconjunto* de valores
+    de la fila, no la posición de cada columna.
     """
     telemetry = NullTelemetry()
     question = "¿Cuál es el país con más unidades vendidas de productos de Animal Health?"
@@ -59,8 +64,8 @@ def test_ask_is_stateless() -> None:
     )
     second = ask(question, telemetry=telemetry, source="test")
 
-    first_values = [tuple(row.values()) for row in first.rows]
-    second_values = [tuple(row.values()) for row in second.rows]
+    first_values = [tuple(sorted(row.values(), key=repr)) for row in first.rows]
+    second_values = [tuple(sorted(row.values(), key=repr)) for row in second.rows]
     assert first_values == second_values
 
 
