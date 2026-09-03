@@ -13,7 +13,7 @@ import os
 import sys
 from dataclasses import dataclass
 
-from conversational_analytics.ops import deploy
+from conversational_analytics.ops import deploy, deployments_log
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,12 @@ def main(argv: list[str] | None = None) -> int:
     if not args.head_sha:
         parser.error("falta --head-sha (o la variable de entorno GITHUB_SHA)")
 
+    # D-09 (research.md): el Issue de drift debe incluir el motivo de la ultima accion
+    # registrada en DEPLOYMENTS, independientemente de si hay drift o no.
+    latest = deployments_log.latest_row()
+    reason = (latest or {}).get("reason") or ""
+    deploy.write_github_output("reason", reason)
+
     deployed_sha = deploy.read_deployed_good_sha()
     if deployed_sha is None:
         print("drift: sin tag deployed-good todavia (primer despliegue) -> sin drift")
@@ -60,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     deploy.write_github_output("head_sha", status.head_sha)
     print(
         f"drift: deployed={status.deployed_sha} head={status.head_sha} "
-        f"has_drift={status.has_drift}"
+        f"has_drift={status.has_drift} reason={reason!r}"
     )
     return 0
 

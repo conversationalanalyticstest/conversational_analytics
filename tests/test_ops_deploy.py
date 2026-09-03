@@ -138,6 +138,26 @@ def test_exists_successful_deploy() -> None:
     assert deployments_log.exists_successful_deploy(target_commit_sha=sha) is True
 
 
+@pytest.mark.writes_db
+def test_latest_row_returns_most_recent_row_with_reason() -> None:
+    sha = uuid.uuid4().hex[:12]
+    deployments_log.record(
+        action="DEPLOY",
+        target_commit_sha=sha,
+        status="FAILED",
+        triggered_by="pytest",
+        workflow_run_url="https://example.invalid/run/1",
+        reason="fallo simulado en evaluacion post-deploy",
+    )
+
+    latest = deployments_log.latest_row()
+
+    assert latest is not None
+    assert latest["action"] == "DEPLOY"
+    assert latest["target_commit_sha"] == sha
+    assert latest["reason"] == "fallo simulado en evaluacion post-deploy"
+
+
 # ---------------------------------------------------------------------------
 # ops.deploy — modo release completa (T017/US2)
 # ---------------------------------------------------------------------------

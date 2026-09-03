@@ -85,8 +85,9 @@ jobs:
           existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label drift --state open \
             --json number -q '.[0].number // empty')
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          reason="${{ steps.drift.outputs.reason }}"
           if [ "${{ steps.drift.outputs.has_drift }}" = "true" ]; then
-            body="main esta en \`${{ steps.drift.outputs.head_sha }}\` pero lo desplegado en Snowflake es \`${{ steps.drift.outputs.deployed_sha }}\` (tras revert manual a \`${{ inputs.target_commit_sha }}\`). Run: $run_url"
+            body="main esta en \`${{ steps.drift.outputs.head_sha }}\` pero lo desplegado en Snowflake es \`${{ steps.drift.outputs.deployed_sha }}\` (tras revert manual a \`${{ inputs.target_commit_sha }}\`). Motivo del ultimo despliegue registrado: ${reason:-sin motivo registrado}. Run: $run_url"
             if [ -n "$existing" ]; then
               gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
             else

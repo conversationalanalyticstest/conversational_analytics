@@ -126,6 +126,36 @@ def last_successful_deploy(*, exclude_commit_sha: str | None = None) -> dict[str
     return {"target_commit_sha": row[0], "deployed_at": row[1]}
 
 
+def latest_row() -> dict[str, Any] | None:
+    """Devuelve `ACTION`/`REASON`/`TARGET_COMMIT_SHA` de la fila mas reciente de `DEPLOYMENTS`.
+
+    A diferencia de `last_successful_deploy`, no filtra por `STATUS`: sirve para que `ops/drift.py`
+    incluya el motivo de la ultima accion (exitosa o no) en el Issue de drift (D-09,
+    research.md), sin importar si esa fila fue un deploy, un rollback o un revert.
+
+    Returns:
+        `{"action": ..., "reason": ..., "target_commit_sha": ...}`, o `None` si `DEPLOYMENTS`
+        todavia no tiene ninguna fila.
+    """
+    conn = db.get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ACTION, REASON, TARGET_COMMIT_SHA
+                FROM CICD_DEMO.DEVOPS.DEPLOYMENTS
+                ORDER BY DEPLOYED_AT DESC
+                LIMIT 1
+                """
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return {"action": row[0], "reason": row[1], "target_commit_sha": row[2]}
+
+
 def exists_successful_deploy(*, target_commit_sha: str) -> bool:
     """FR-014: valida que un SHA objetivo de revert tenga un despliegue exitoso registrado.
 

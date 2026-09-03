@@ -91,8 +91,11 @@ jobs:
         run: poetry run python -m conversational_analytics.ops.deploy --confirm "$GITHUB_SHA"
 
       # Paso 8: evaluacion en rojo -> forward-fix a la ultima release buena conocida. Si el
-      # propio rollback falla, este step termina el job en rojo sin reintentar (FR-011).
+      # propio rollback falla, este step termina el job en rojo sin reintentar (FR-011). `id`
+      # necesario para que el paso de gestion del Issue de drift sepa si este step fallo y
+      # marque el Issue como incidente en vez de drift rutinario.
       - name: Rollback automatico (forward-fix)
+        id: rollback
         if: steps.post_deploy_eval.outcome == 'failure'
         run: poetry run python -m conversational_analytics.ops.rollback --failed-sha "$GITHUB_SHA"
 
@@ -118,8 +121,21 @@ jobs:
           existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --label drift --state open \
             --json number -q '.[0].number // empty')
           run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ "${{ steps.drift.outputs.has_drift }}" = "true" ]; then
-            body="main esta en \`${{ steps.drift.outputs.head_sha }}\` pero lo desplegado en Snowflake es \`${{ steps.drift.outputs.deployed_sha }}\`. Run: $run_url"
+          reason="${{ steps.drift.outputs.reason }}"
+          # FR-011 / contracts/workflows.md (paso 8): si el rollback automatico de este mismo
+          # run fallo, el Issue de drift se marca como incidente en vez de reutilizar el texto
+          # generico de drift rutinario.
+          if [ "${{ steps.post_deploy_eval.outcome }}" = "failure" ] && [ "${{ steps.rollback.outcome }}" = "failure" ]; then
+            title="INCIDENTE: rollback automatico fallido en produccion"
+            body="El rollback automatico de este run fallo (ver $run_url) y Snowflake puede haber quedado en un estado no operativo. Revisar manualmente. Motivo del ultimo despliegue registrado: ${reason:-sin motivo registrado}."
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "🚨 $title. $body"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "🚨 $title" \
+                --label drift --body "$body"
+            fi
+          elif [ "${{ steps.drift.outputs.has_drift }}" = "true" ]; then
+            body="main esta en \`${{ steps.drift.outputs.head_sha }}\` pero lo desplegado en Snowflake es \`${{ steps.drift.outputs.deployed_sha }}\`. Motivo del ultimo despliegue registrado: ${reason:-sin motivo registrado}. Run: $run_url"
             if [ -n "$existing" ]; then
               gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
             else
