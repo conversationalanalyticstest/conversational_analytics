@@ -93,9 +93,7 @@ def test_rollback_records_auto_rollback_row_and_moves_tag(
     monkeypatch.setattr(deploy, "read_deployed_good_sha", lambda: good_sha)
 
     applied: list[str] = []
-    monkeypatch.setattr(
-        deploy, "apply_release_artifacts", lambda sha: applied.append(sha) or "SV_STUB"
-    )
+    monkeypatch.setattr(deploy, "apply_release_artifacts", lambda sha: applied.append(sha))
     tag_moves: list[str] = []
     monkeypatch.setattr(deploy, "move_deployed_good_tag", lambda sha: tag_moves.append(sha))
 

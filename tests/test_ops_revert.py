@@ -44,9 +44,7 @@ def test_revert_valid_sha_redeploys_and_records_manual_revert(
     _record_deploy(target_sha, run=1)
 
     applied: list[str] = []
-    monkeypatch.setattr(
-        deploy, "apply_release_artifacts", lambda sha: applied.append(sha) or "SV_STUB"
-    )
+    monkeypatch.setattr(deploy, "apply_release_artifacts", lambda sha: applied.append(sha))
     tag_moves: list[str] = []
     monkeypatch.setattr(deploy, "move_deployed_good_tag", lambda sha: tag_moves.append(sha))
     monkeypatch.setenv("GITHUB_ACTOR", "octocat")
