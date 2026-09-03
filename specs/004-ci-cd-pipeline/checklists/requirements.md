@@ -37,4 +37,6 @@
 - El mecanismo concreto de "última release buena" (tag Git ligero vs. tabla de registro en
   Snowflake) se decidió como enfoque preferido en conversación con el usuario (tag + tabla de
   auditoría en Snowflake ya existente vía `COMMIT_SHA` en telemetría) y se detallará en el plan.
+- La estrategia de revert y el versionado de semantic views están documentados en
+  [ADR-001](../decisions/001-estrategia-de-revert.md), que motiva FR-017 a FR-020 y SC-007.
 - Todos los ítems pasan; no se requieren iteraciones adicionales.

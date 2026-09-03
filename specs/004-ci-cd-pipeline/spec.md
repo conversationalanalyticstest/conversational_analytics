@@ -132,6 +132,10 @@ era mejor o más correcta. Puede recuperar esa definición anterior de forma rá
 rollback (User Stories 2-4); estas ya permiten volver atrás, pero esta historia pide que además
 sea rápido identificar y recuperar versiones concretas de una tabla semántica sin manipular Git.
 
+**Nota de diseño**: según [ADR-001](decisions/001-estrategia-de-revert.md), esta historia y la
+User Story 4 se resuelven con el **mismo mecanismo** (semantic views versionadas por SHA más un
+puntero a la versión activa), no con dos implementaciones separadas.
+
 **Independent Test**: Se puede probar desplegando dos versiones sucesivas de una semantic view y
 comprobando que se puede consultar cuáles son las versiones disponibles y volver a activar la
 anterior sin ejecutar ningún comando de Git.
@@ -204,6 +208,16 @@ anterior sin ejecutar ningún comando de Git.
 - **FR-016**: El sistema MUST permitir identificar las versiones previas desplegadas de una
   semantic view y reactivar cualquiera de ellas sin usar `git reset`, `git revert` ni reescribir
   el historial del repositorio.
+- **FR-017**: Desplegar una nueva versión de una semantic view MUST NOT destruir las versiones
+  previamente desplegadas; éstas MUST seguir disponibles para su reactivación.
+- **FR-018**: MUST existir un indicador consultable que identifique qué versión de la semantic
+  view está activa en cada momento, y reactivar una versión anterior MUST consistir en cambiar
+  ese indicador, sin requerir un nuevo despliegue del agente.
+- **FR-019**: El rollback automático (FR-010) y el revert manual (FR-012) MUST actuar sobre la
+  release completa (agente y semantic view conjuntamente), de forma que no puedan dejar ambos
+  artefactos en versiones incompatibles entre sí.
+- **FR-020**: MUST existir una política documentada de retención de versiones antiguas de
+  semantic views, de modo que su acumulación en Snowflake esté acotada.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -219,6 +233,8 @@ anterior sin ejecutar ningún comando de Git.
   activa en Snowflake, incluyendo reverts manuales (quién, cuándo, hacia qué versión).
 - **Versión de semantic view**: definición concreta de una semantic view en un momento dado,
   identificable y recuperable de forma independiente del historial de Git.
+- **Puntero de versión activa**: indicador consultable que señala qué versión de la semantic view
+  está en uso; cambiarlo es la operación de revert (ver [ADR-001](decisions/001-estrategia-de-revert.md)).
 
 ## Success Criteria *(mandatory)*
 
@@ -237,6 +253,8 @@ anterior sin ejecutar ningún comando de Git.
   actualmente en Snowflake sin necesidad de revisar logs de ejecución del pipeline.
 - **SC-006**: Volver a una versión anterior de una semantic view no requiere ningún comando que
   reescriba el historial de Git (`git reset`, `push --force`, etc.).
+- **SC-007**: Tras desplegar una versión nueva de una semantic view, el 100% de las versiones
+  previamente desplegadas (dentro de la ventana de retención) siguen siendo reactivables.
 
 ## Assumptions
 
@@ -254,5 +272,11 @@ anterior sin ejecutar ningún comando de Git.
 - El versionado de semantic views (User Story 5) se apoya en un mecanismo propio (por ejemplo,
   metadatos o una tabla de historial en Snowflake), no en clonar el flujo de Git; el diseño
   concreto se define en el plan de la feature.
+- La granularidad de revert es la release completa: no es posible revertir solo el código del
+  agente sin revertir también la semantic view. Es una decisión consciente ([ADR-001](decisions/001-estrategia-de-revert.md))
+  a favor de la seguridad y la simplicidad, frente al revert independiente por componente.
+- El revert no reescribe el historial de Git: tras un rollback, `main` puede quedar por delante
+  de lo desplegado en Snowflake, y recuperar la coherencia exige un *fix forward* con un commit
+  nuevo.
 - La feature reutiliza la suite de tests ya existente (`pytest`) como criterio de "verde/rojo"
   tanto en PR como en post-merge y post-deploy; no se definen nuevos criterios de calidad aquí.
