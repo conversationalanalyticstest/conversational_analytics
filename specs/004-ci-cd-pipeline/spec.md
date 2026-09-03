@@ -79,6 +79,9 @@ que nadie tenga que intervenir a mano, y notifica al equipo qué pasó y qué se
 de que exista un despliegue y una evaluación post-deploy (User Story 2), por eso es secundaria a
 esa base.
 
+**Nota de diseño**: el mecanismo elegido (re-despliegue de la última release buena, *forward-fix*)
+y las alternativas descartadas están documentados en [ADR-002](decisions/002-rollback-automatico.md).
+
 **Independent Test**: Se puede probar desplegando un cambio que se sabe que falla la evaluación
 post-deploy y comprobando que, sin intervención manual, Snowflake vuelve a quedar en el estado
 (commit SHA) previo al despliegue fallido.
@@ -228,7 +231,7 @@ anterior sin ejecutar ningún comando de Git.
 - **Release**: conjunto de artefactos desplegados a Snowflake en un momento dado, identificado de
   forma única por el commit SHA de `main` que lo originó.
 - **Última release buena**: puntero a la release más reciente cuya evaluación post-deploy fue
-  exitosa; es el destino del rollback automático.
+  exitosa; es el destino del rollback automático (ver [ADR-002](decisions/002-rollback-automatico.md)).
 - **Registro de despliegues/reverts**: histórico consultable de qué release está o ha estado
   activa en Snowflake, incluyendo reverts manuales (quién, cuándo, hacia qué versión).
 - **Versión de semantic view**: definición concreta de una semantic view en un momento dado,
@@ -266,6 +269,8 @@ anterior sin ejecutar ningún comando de Git.
 - El rollback automático y el revert manual actúan sobre artefactos desplegables (scripts SQL,
   semantic views, código del agente); no cubren la reversión de datos de negocio ya modificados
   por operaciones DML posteriores al despliegue.
+- Si no existe ninguna release previa con evaluación post-deploy exitosa (primer despliegue del
+  proyecto), no hay destino de rollback: el pipeline se limita a notificar el fallo.
 - Un cambio de esquema incompatible entre releases (p. ej. columna eliminada) puede hacer que un
   rollback o revert falle de forma visible; resolverlo en ese caso requiere intervención manual,
   fuera del alcance de esta feature.
