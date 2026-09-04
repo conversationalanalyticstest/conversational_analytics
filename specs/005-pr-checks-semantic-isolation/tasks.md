@@ -49,11 +49,22 @@ Snowflake).
 - [ ] T002 Implementar `candidate_object_name(pr_number: str) -> str` y
       `render_candidate_ddl(sql_text: str, object_name: str) -> str` en
       `src/conversational_analytics/ops/pr_candidate.py` (hace pasar T001).
-- [ ] T003 [P] Extender `tests/test_ops_pr_candidate.py` con un test marcado
-      `@pytest.mark.writes_db` que llama a `build_candidate()`, comprueba con
-      `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA` que el objeto candidato existe, llama a
-      `drop_candidate()` y comprueba que ya no existe. Debe **fallar** antes de T004 (depende de
-      T002).
+- [ ] T003 [P] Extender `tests/test_ops_pr_candidate.py` con tres tests, todos deben **fallar**
+      antes de T004 (depende de T002):
+      1. `@pytest.mark.writes_db` — llama a `build_candidate()`, comprueba con
+         `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA` que el objeto candidato existe, llama a
+         `drop_candidate()` y comprueba que ya no existe (camino feliz).
+      2. `@pytest.mark.writes_db` — antes de construir la candidata, captura
+         `DESCRIBE SEMANTIC VIEW CICD_DEMO.DATA.SV_PHARMA_SALES` (producción); ejecuta el ciclo
+         completo `build_candidate()` + `drop_candidate()`; vuelve a capturar el mismo
+         `DESCRIBE` y **compara que es idéntico**. Automatiza SC-002 (la propiedad de seguridad
+         central de la feature: la candidata nunca toca producción), en vez de dejarla solo en
+         la validación manual de T008.
+      3. Sin marcar `writes_db` — usa `monkeypatch` para que
+         `sql_runner.run_sql_string` lance una excepción, y comprueba que `build_candidate()`
+         **no la captura ni la convierte en un resultado silencioso** (se propaga tal cual).
+         Cubre FR-007 ("si la creación de la copia falla, el check MUST fallar explícitamente")
+         sin depender de Snowflake real.
 - [ ] T004 Implementar `build_candidate(pr_number: str) -> None` (lee
       `snowflake/004_semantic_view.sql` del working tree, llama a `render_candidate_ddl` y
       ejecuta el resultado con `sql_runner.run_sql_string`) y
@@ -85,7 +96,13 @@ y comprobar que el check falla citando la candidata (`SV_PHARMA_SALES_PR<n>`), m
       al bloque `env`; añadir el paso "Build candidate semantic view"
       (`poetry run python -m conversational_analytics.ops.pr_candidate build --pr-number
       ${{ github.event.pull_request.number }}`) antes del paso de tests existente (depende de
-      T005).
+      T005). Actualizar también el comentario de cabecera del fichero (líneas 2-5, que hoy dice
+      "...contra la semantic view activa en producción, sin desplegar nada... ver ADR-003") para
+      que referencie en su lugar
+      [contracts/pr-candidate-workflow.md](contracts/pr-candidate-workflow.md) y
+      [decisions/001-aislar-semantic-view-candidata-en-pr.md](decisions/001-aislar-semantic-view-candidata-en-pr.md)
+      — evita que quede describiendo un comportamiento ya superado, igual que se hace en T014-T016
+      para la documentación de la feature 004.
 - [ ] T007 [US1] En el mismo fichero, añadir el paso "Drop candidate semantic view" al final del
       job, con `if: always()`
       (`poetry run python -m conversational_analytics.ops.pr_candidate drop --pr-number
@@ -119,11 +136,12 @@ semantic view ejecutándose a la vez, y comprobar que cada uno valida su propio 
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] Ninguna. La propiedad de no colisión ya la garantizan `candidate_object_name()`
-      (T002, un objeto distinto por número de PR) y el `concurrency.group:
-      pr-checks-${{ github.event.pull_request.number }}` ya existente en `pr-checks.yml` (sin
-      cambios, feature 004) — no hay código nuevo que escribir para esta historia, solo
-      verificarla.
+- [ ] T010 [US2] Ejecutar `poetry run pytest tests/test_ops_pr_candidate.py -v` y confirmar que
+      el test de T009 pasa, y dejar constancia (en la descripción de la PR de esta fase) de que
+      la propiedad de no colisión de User Story 2 no requiere código nuevo: ya la garantizan
+      `candidate_object_name()` (T002, un objeto distinto por número de PR) y el
+      `concurrency.group: pr-checks-${{ github.event.pull_request.number }}` ya existente en
+      `pr-checks.yml` (sin cambios, feature 004).
 - [ ] T011 [US2] **Manual (requiere 2 PRs reales en GitHub)** Validar el Escenario 3 de
       [quickstart.md](./quickstart.md): dos PRs con definiciones de semantic view distintas,
       checks en paralelo, cada uno con el resultado correcto para su propio contenido. Pendiente
@@ -230,7 +248,7 @@ comportamiento vigente.
 
 ```bash
 Task: "Escribir tests/test_ops_pr_candidate.py cubriendo candidate_object_name() y render_candidate_ddl()"
-Task: "Extender tests/test_ops_pr_candidate.py con un test @pytest.mark.writes_db para build_candidate()/drop_candidate()"
+Task: "Extender tests/test_ops_pr_candidate.py con el ciclo de vida real (writes_db), el snapshot de no-modificación de SV_PHARMA_SALES (writes_db) y el test de propagación de error (monkeypatch, sin Snowflake)"
 ```
 
 ## Parallel Example: Polish
@@ -275,3 +293,8 @@ Task: "Actualizar docs/ci-cd-pipeline.md"
   planificación.
 - Verificar que los tests fallan antes de implementar (T001→T002, T003→T004).
 - Commitear tras cada tarea o grupo lógico de tareas, seguido de `poetry run pytest`.
+- Este `tasks.md` incorpora las correcciones de la pasada `speckit-analyze` de la propia
+  feature: T003 ahora automatiza SC-002 (no-modificación de producción) y FR-007 (fallo
+  explícito en la creación) en vez de dejarlos solo en validación manual; T006 incluye
+  actualizar el comentario de cabecera de `pr-checks.yml` para que no quede describiendo el
+  comportamiento pre-005; T010 deja de ser una tarea vacía y pasa a una verificación concreta.
