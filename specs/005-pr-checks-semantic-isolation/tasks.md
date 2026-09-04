@@ -40,16 +40,16 @@ Snowflake).
 
 **⚠️ CRITICAL**: ninguna historia de usuario puede completarse sin esta fase.
 
-- [ ] T001 [P] Escribir `tests/test_ops_pr_candidate.py` cubriendo `candidate_object_name()`
+- [X] T001 [P] Escribir `tests/test_ops_pr_candidate.py` cubriendo `candidate_object_name()`
       (nombre determinista `CICD_DEMO.DATA.SV_PHARMA_SALES_PR<n>` a partir de un número de PR) y
       `render_candidate_ddl()` (sustituye las 12 apariciones del token `SV_PHARMA_SALES` por el
       nombre corto de la candidata, sobre el contenido real de
       `snowflake/004_semantic_view.sql`); ambos sin tocar Snowflake. Debe **fallar** antes de
       T002 (ver [contracts/pr-candidate-workflow.md](contracts/pr-candidate-workflow.md)).
-- [ ] T002 Implementar `candidate_object_name(pr_number: str) -> str` y
+- [X] T002 Implementar `candidate_object_name(pr_number: str) -> str` y
       `render_candidate_ddl(sql_text: str, object_name: str) -> str` en
       `src/conversational_analytics/ops/pr_candidate.py` (hace pasar T001).
-- [ ] T003 [P] Extender `tests/test_ops_pr_candidate.py` con tres tests, todos deben **fallar**
+- [X] T003 [P] Extender `tests/test_ops_pr_candidate.py` con tres tests, todos deben **fallar**
       antes de T004 (depende de T002):
       1. `@pytest.mark.writes_db` — llama a `build_candidate()`, comprueba con
          `SHOW SEMANTIC VIEWS IN SCHEMA CICD_DEMO.DATA` que el objeto candidato existe, llama a
@@ -65,13 +65,13 @@ Snowflake).
          **no la captura ni la convierte en un resultado silencioso** (se propaga tal cual).
          Cubre FR-007 ("si la creación de la copia falla, el check MUST fallar explícitamente")
          sin depender de Snowflake real.
-- [ ] T004 Implementar `build_candidate(pr_number: str) -> None` (lee
+- [X] T004 Implementar `build_candidate(pr_number: str) -> None` (lee
       `snowflake/004_semantic_view.sql` del working tree, llama a `render_candidate_ddl` y
       ejecuta el resultado con `sql_runner.run_sql_string`) y
       `drop_candidate(pr_number: str) -> None` (`DROP SEMANTIC VIEW IF EXISTS
       <candidate_object_name(pr_number)>`, también vía `sql_runner.run_sql_string`) en
       `src/conversational_analytics/ops/pr_candidate.py` (hace pasar T003; depende de T002).
-- [ ] T005 Añadir la CLI (`argparse`, mismo estilo que `ops/deploy.py`) a
+- [X] T005 Añadir la CLI (`argparse`, mismo estilo que `ops/deploy.py`) a
       `src/conversational_analytics/ops/pr_candidate.py`: subcomandos `build --pr-number N` y
       `drop --pr-number N`, invocando `build_candidate`/`drop_candidate` (depende de T004).
 
@@ -90,7 +90,7 @@ y comprobar que el check falla citando la candidata (`SV_PHARMA_SALES_PR<n>`), m
 `SHOW SEMANTIC VIEWS` muestra `SV_PHARMA_SALES` sin cambios (Escenario 1 de
 [quickstart.md](./quickstart.md)).
 
-- [ ] T006 [US1] Modificar `.github/workflows/pr-checks.yml` según
+- [X] T006 [US1] Modificar `.github/workflows/pr-checks.yml` según
       [contracts/pr-candidate-workflow.md](contracts/pr-candidate-workflow.md): añadir
       `SNOWFLAKE_SEMANTIC_VIEW: CICD_DEMO.DATA.SV_PHARMA_SALES_PR${{ github.event.pull_request.number }}`
       al bloque `env`; añadir el paso "Build candidate semantic view"
@@ -103,7 +103,7 @@ y comprobar que el check falla citando la candidata (`SV_PHARMA_SALES_PR<n>`), m
       [decisions/001-aislar-semantic-view-candidata-en-pr.md](decisions/001-aislar-semantic-view-candidata-en-pr.md)
       — evita que quede describiendo un comportamiento ya superado, igual que se hace en T014-T016
       para la documentación de la feature 004.
-- [ ] T007 [US1] En el mismo fichero, añadir el paso "Drop candidate semantic view" al final del
+- [X] T007 [US1] En el mismo fichero, añadir el paso "Drop candidate semantic view" al final del
       job, con `if: always()`
       (`poetry run python -m conversational_analytics.ops.pr_candidate drop --pr-number
       ${{ github.event.pull_request.number }}`), de modo que la candidata de cada ejecución se
@@ -128,7 +128,7 @@ semantic view ejecutándose a la vez, y comprobar que cada uno valida su propio 
 
 ### Tests for User Story 2
 
-- [ ] T009 [P] [US2] Extender `tests/test_ops_pr_candidate.py` con un test que verifique que
+- [X] T009 [P] [US2] Extender `tests/test_ops_pr_candidate.py` con un test que verifique que
       `candidate_object_name("101") != candidate_object_name("202")` (nombres distintos para
       números de PR distintos) — propiedad de la que depende toda la garantía de no colisión.
       Debe **fallar** solo si la implementación de T002 fuera incorrecta (test de regresión, no
@@ -136,7 +136,7 @@ semantic view ejecutándose a la vez, y comprobar que cada uno valida su propio 
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] Ejecutar `poetry run pytest tests/test_ops_pr_candidate.py -v` y confirmar que
+- [X] T010 [US2] Ejecutar `poetry run pytest tests/test_ops_pr_candidate.py -v` y confirmar que
       el test de T009 pasa, y dejar constancia (en la descripción de la PR de esta fase) de que
       la propiedad de no colisión de User Story 2 no requiere código nuevo: ya la garantizan
       `candidate_object_name()` (T002, un objeto distinto por número de PR) y el
@@ -159,7 +159,7 @@ cerrarse la PR — sin tabla de registro ni workflow de barrido.
 **Independent Test**: cancelar deliberadamente un check en curso y, tras cerrar la PR, comprobar
 que su candidata ya no existe (Escenario 4 de [quickstart.md](./quickstart.md)).
 
-- [ ] T012 [US3] Modificar `.github/workflows/pr-checks.yml`: añadir `closed` a
+- [X] T012 [US3] Modificar `.github/workflows/pr-checks.yml`: añadir `closed` a
       `pull_request.types` (`[opened, synchronize, reopened, closed]`) y condicionar los pasos
       "Build candidate semantic view" y "Run test suite" (T006) con
       `if: github.event.action != 'closed'`, de modo que un evento `closed` solo ejecute el paso
@@ -179,29 +179,34 @@ candidata sobrevive indefinidamente a una PR cerrada.
 **Purpose**: dejar la documentación de la feature 004 (que este cambio revierte parcialmente) y
 la documentación general del repo coherentes con el nuevo comportamiento.
 
-- [ ] T014 [P] Actualizar
+- [X] T014 [P] Actualizar
       `specs/004-ci-cd-pipeline/contracts/workflows.md` (sección `pr-checks.yml`): sustituir "sin
       desplegar nada... corre contra la semantic view activa en producción" por una referencia a
       [contracts/pr-candidate-workflow.md](contracts/pr-candidate-workflow.md) de esta feature.
-- [ ] T015 [P] Actualizar
+- [X] T015 [P] Actualizar
       `specs/004-ci-cd-pipeline/contracts/semantic-view-versioning.md` (sección "PR checks: sin
       despliegue de candidato"): reemplazar por una nota que remita a esta feature y a
       [decisions/001-aislar-semantic-view-candidata-en-pr.md](decisions/001-aislar-semantic-view-candidata-en-pr.md).
-- [ ] T016 [P] Añadir en
+- [X] T016 [P] Añadir en
       `specs/004-ci-cd-pipeline/decisions/003-simplificacion-semantic-view.md` una nota en el
       punto 4 (siguiendo el mismo estilo que la nota de "supersede a" que ADR-003 ya añadió sobre
       ADR-001): indica que ese punto queda parcialmente superseded por
       [ADR-001 de esta feature](decisions/001-aislar-semantic-view-candidata-en-pr.md).
-- [ ] T017 [P] Actualizar la fila de `pr-checks.yml` en la tabla de CI/CD de `README.md` (línea
+- [X] T017 [P] Actualizar la fila de `pr-checks.yml` en la tabla de CI/CD de `README.md` (línea
       ~99) para reflejar que valida contra una copia candidata, no contra producción.
-- [ ] T018 [P] Actualizar `docs/ci-cd-pipeline.md` (§2 nota sobre "el check de pr-checks.yml es
+- [X] T018 [P] Actualizar `docs/ci-cd-pipeline.md` (§2 nota sobre "el check de pr-checks.yml es
       contra la semantic view actual de producción" y §5.5 "Trade-off aceptado: una PR no valida
       cambios de semantic view hasta el merge"), y el diagrama de la sección 2, para reflejar el
       nuevo comportamiento — este es el documento cuya observación motivó la feature.
-- [ ] T019 **Manual (requiere acceso a Snowflake)** Confirmar que `CICD_DEMO_ROLE` puede crear y
+- [X] T019 **Manual (requiere acceso a Snowflake)** Confirmar que `CICD_DEMO_ROLE` puede crear y
       eliminar semantic views en `CICD_DEMO.DATA` sin conceder ningún permiso nuevo (ya es
       propietario del esquema, verificado en la feature 004, tasks.md T051); si hiciera falta un
       `GRANT`, documentarlo aquí y ejecutarlo.
+      **Verificado empíricamente** (implement, feature 005): `test_build_and_drop_candidate_round_trip`
+      y `test_build_and_drop_candidate_does_not_modify_production` (`tests/test_ops_pr_candidate.py`,
+      marcados `writes_db`) crearon y eliminaron `SV_PHARMA_SALES_PR<n>` de verdad contra la cuenta
+      real con la conexión/rol existente (`CICD_DEMO_ROLE`), sin ningún `GRANT` adicional. No hace
+      falta ninguna acción.
 - [ ] T020 Ejecutar el guion completo de [quickstart.md](./quickstart.md) de punta a punta
       (Escenarios 1 a 4 más la verificación de no regresión sobre `DEPLOYMENTS`) para confirmar
       que la demo sigue siendo válida tras esta feature.

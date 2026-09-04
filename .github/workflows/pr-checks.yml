@@ -1,15 +1,16 @@
 name: pr-checks
 
-# Contrato: specs/004-ci-cd-pipeline/contracts/workflows.md#pr-checksyml
-# Valida una PR contra main ejecutando la suite completa contra la semantic view activa en
-# produccion, sin desplegar nada (ver decisions/003-simplificacion-semantic-view.md, ADR-003).
-# El check "pr-checks" es el required status check de la proteccion de rama (FR-002, FR-003)
-# — se configura a mano (tasks.md T003).
+# Contrato: specs/005-pr-checks-semantic-isolation/contracts/pr-candidate-workflow.md
+# Valida una PR contra main ejecutando la suite completa contra una copia efimera y aislada de
+# la semantic view ("candidata", SV_PHARMA_SALES_PR<numero>), nunca contra la de produccion
+# (ver decisions/001-aislar-semantic-view-candidata-en-pr.md). El check "pr-checks" es el
+# required status check de la proteccion de rama (FR-002, FR-003) — se configura a mano
+# (tasks.md T003 de la feature 004-ci-cd-pipeline).
 
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
   contents: read
@@ -33,6 +34,7 @@ env:
   AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
   AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
   CORTEX_MODEL: ${{ secrets.CORTEX_MODEL }}
+  SNOWFLAKE_SEMANTIC_VIEW: CICD_DEMO.DATA.SV_PHARMA_SALES_PR${{ github.event.pull_request.number }}
 
 jobs:
   pr-checks:
@@ -52,5 +54,14 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction
 
+      - name: Build candidate semantic view
+        if: github.event.action != 'closed'
+        run: poetry run python -m conversational_analytics.ops.pr_candidate build --pr-number ${{ github.event.pull_request.number }}
+
       - name: Run test suite
+        if: github.event.action != 'closed'
         run: poetry run pytest
+
+      - name: Drop candidate semantic view
+        if: always()
+        run: poetry run python -m conversational_analytics.ops.pr_candidate drop --pr-number ${{ github.event.pull_request.number }}

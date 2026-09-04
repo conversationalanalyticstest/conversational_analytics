@@ -49,6 +49,13 @@ feature 003, sin la resolución de puntero que existió durante la Opción 2):
 
 ## PR checks: sin despliegue de candidato
 
+> ⚠️ **Superseded por la feature
+> [005-pr-checks-semantic-isolation](../../005-pr-checks-semantic-isolation/spec.md)**:
+> `pr-checks.yml` ahora sí construye una copia efímera y aislada de la semantic view
+> ("candidata") para validar la PR, y la elimina al terminar — nunca toca la de producción. Ver
+> [decisions/001-aislar-semantic-view-candidata-en-pr.md](../../005-pr-checks-semantic-isolation/decisions/001-aislar-semantic-view-candidata-en-pr.md)
+> de esa feature para el diseño vigente. Lo que sigue queda como registro histórico.
+
 `pr-checks.yml` **no despliega nada**. Ejecuta `poetry run pytest` directamente contra la
 semantic view activa en producción (sin overrides). Es una limitación consciente: un cambio de
 `004_semantic_view.sql` en una PR no se valida contra Cortex Analyst real hasta el merge; la

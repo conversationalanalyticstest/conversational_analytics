@@ -10,6 +10,13 @@ fija el contrato que esa implementación MUST cumplir.
 
 ## `pr-checks.yml`
 
+> ⚠️ **Actualizado por la feature
+> [005-pr-checks-semantic-isolation](../../005-pr-checks-semantic-isolation/spec.md)**: el check
+> ya no corre contra la semantic view de producción, sino contra una copia efímera y aislada
+> ("candidata"). El contrato vigente es
+> [pr-candidate-workflow.md](../../005-pr-checks-semantic-isolation/contracts/pr-candidate-workflow.md)
+> de esa feature; lo que sigue queda como registro histórico del diseño original (ADR-003).
+
 **Disparador**: `pull_request` (`opened`, `synchronize`, `reopened`) contra `main`.
 
 **Permisos**: `contents: read` únicamente. No escribe en el repositorio ni despliega nada en
