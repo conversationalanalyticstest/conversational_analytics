@@ -62,6 +62,14 @@ sin sufijo de commit, actualizado siempre in place:
    fusiona; el propio `deploy.yml` (evaluación post-deploy + rollback automático) actúa como red
    de seguridad para ese caso. Se acepta este trade-off a cambio de eliminar una pieza entera del
    pipeline, en línea con el Principio I (simplicidad, explicable en 5 minutos).
+
+   > ⚠️ **Parcialmente superseded por
+   > [ADR-001 de la feature 005-pr-checks-semantic-isolation](../../005-pr-checks-semantic-isolation/decisions/001-aislar-semantic-view-candidata-en-pr.md)**:
+   > el mecanismo de "semantic view candidata" para `pr-checks.yml` se reintrodujo, de forma
+   > acotada (sin tabla de registro, un objeto efímero por PR derivado de su número). El resto
+   > de este punto 4 — y el trade-off que describía — queda como registro histórico de por qué
+   > se eliminó la primera vez.
+
 5. **User Story 5 se retira de la spec.** "Volver atrás en una semantic view sin Git" deja de
    ser un requisito propio: queda cubierta por el revert de release completa (User Story 4), que
    ahora sí usa Git como mecanismo real.
