@@ -108,10 +108,17 @@ y comprobar que el check falla citando la candidata (`SV_PHARMA_SALES_PR<n>`), m
       (`poetry run python -m conversational_analytics.ops.pr_candidate drop --pr-number
       ${{ github.event.pull_request.number }}`), de modo que la candidata de cada ejecución se
       elimine tanto si los tests pasan como si fallan (depende de T006).
-- [ ] T008 [US1] **Manual (requiere PR real en GitHub)** Validar los Escenarios 1 y 2 de
+- [X] T008 [US1] **Manual (requiere PR real en GitHub)** Validar los Escenarios 1 y 2 de
       [quickstart.md](./quickstart.md): PR con error deliberado en la semantic view bloquea el
       check citando la candidata y no toca producción; PR corregida pasa y, tras terminar, la
       candidata ya no existe. Pendiente de T006, T007.
+      Validado 2026-09-04 en PR #6 (`conversationalanalyticstest/conversational_analytics`):
+      Escenario 1 — commit con `SALE.NET_AMONT` (columna inexistente) hizo fallar el paso
+      "Build candidate semantic view" con `invalid identifier 'SALE.NET_AMONT'`, el paso "Run
+      test suite" se saltó y `GET_DDL` de `SV_PHARMA_SALES` en producción confirmó que no
+      cambió. Escenario 2 — tras el commit de fix y un rerun en verde (run `33859436830`,
+      conclusion `success`, los 3 pasos clave en `success`), `GET_DDL('SEMANTIC_VIEW',
+      'CICD_DEMO.DATA.SV_PHARMA_SALES_PR6')` confirma que la candidata ya no existe.
 
 **Checkpoint**: User Story 1 funcional de forma independiente — el check valida contra una copia
 aislada y se limpia solo al terminar cada ejecución.
