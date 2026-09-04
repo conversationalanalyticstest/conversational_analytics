@@ -149,10 +149,16 @@ semantic view ejecutándose a la vez, y comprobar que cada uno valida su propio 
       `candidate_object_name()` (T002, un objeto distinto por número de PR) y el
       `concurrency.group: pr-checks-${{ github.event.pull_request.number }}` ya existente en
       `pr-checks.yml` (sin cambios, feature 004).
-- [ ] T011 [US2] **Manual (requiere 2 PRs reales en GitHub)** Validar el Escenario 3 de
+- [X] T011 [US2] **Manual (requiere 2 PRs reales en GitHub)** Validar el Escenario 3 de
       [quickstart.md](./quickstart.md): dos PRs con definiciones de semantic view distintas,
       checks en paralelo, cada uno con el resultado correcto para su propio contenido. Pendiente
       de T006, T007.
+      Validado 2026-09-04: PR #6 (rama `005-pr-checks-semantic-isolation`, contenido correcto) y
+      PR #7 (rama `005-demo-pr7-concurrency-test`, error deliberado distinto en `GROSS_SALES`)
+      dispararon sus checks casi a la vez (runs `33860835708` y `33860926548`). Cada uno usó su
+      propio objeto (`SV_PHARMA_SALES_PR6` / `SV_PHARMA_SALES_PR7`) y terminó con el resultado
+      correcto para su propio contenido (success / failure respectivamente), sin interferencia
+      cruzada; ambas candidatas se limpiaron al terminar.
 
 **Checkpoint**: User Stories 1 y 2 (MVP completo) funcionan de forma independiente.
 
@@ -171,10 +177,16 @@ que su candidata ya no existe (Escenario 4 de [quickstart.md](./quickstart.md)).
       "Build candidate semantic view" y "Run test suite" (T006) con
       `if: github.event.action != 'closed'`, de modo que un evento `closed` solo ejecute el paso
       de limpieza (T007, ya incondicional vía `if: always()`) (depende de T006, T007).
-- [ ] T013 [US3] **Manual (requiere PR real en GitHub)** Validar el Escenario 4 de
+- [X] T013 [US3] **Manual (requiere PR real en GitHub)** Validar el Escenario 4 de
       [quickstart.md](./quickstart.md): push que cancela una ejecución en curso
       (`cancel-in-progress`), cierre de la PR, y comprobación de que
       `SV_PHARMA_SALES_PR<número>` no existe tras el cierre. Pendiente de T012.
+      Validado 2026-09-04 en PR #7: un primer push (run `33861288477`) fue cancelado por un
+      segundo push casi inmediato (run `33861316458`, mismo `concurrency.group`); ese segundo run
+      fue a su vez cancelado por el evento `closed` al cerrar la PR sin esperar. El run del
+      cierre (`33861323745`, `conclusion=success`) mostró "Build candidate semantic view" y "Run
+      test suite" en `skipped` y "Drop candidate semantic view" en `success`; `GET_DDL` confirmó
+      que `SV_PHARMA_SALES_PR7` no existe tras el cierre.
 
 **Checkpoint**: las tres historias de usuario funcionan de forma independiente; ninguna
 candidata sobrevive indefinidamente a una PR cerrada.
@@ -214,9 +226,13 @@ la documentación general del repo coherentes con el nuevo comportamiento.
       marcados `writes_db`) crearon y eliminaron `SV_PHARMA_SALES_PR<n>` de verdad contra la cuenta
       real con la conexión/rol existente (`CICD_DEMO_ROLE`), sin ningún `GRANT` adicional. No hace
       falta ninguna acción.
-- [ ] T020 Ejecutar el guion completo de [quickstart.md](./quickstart.md) de punta a punta
+- [X] T020 Ejecutar el guion completo de [quickstart.md](./quickstart.md) de punta a punta
       (Escenarios 1 a 4 más la verificación de no regresión sobre `DEPLOYMENTS`) para confirmar
       que la demo sigue siendo válida tras esta feature.
+      Validado 2026-09-04 con PRs reales #6 y #7 (ver T008, T011, T013): los 4 escenarios
+      pasaron. `SELECT * FROM CICD_DEMO.DEVOPS.DEPLOYMENTS ORDER BY 1 DESC LIMIT 5` no muestra
+      ninguna fila nueva causada por estos checks (los checks de PR no escriben en `DEPLOYMENTS`,
+      solo `deploy.yml`/`rollback.py` lo hacen) — sin regresión.
 
 **Checkpoint**: documentación de las features 004 y 005, y del repo en general, coherente con el
 comportamiento vigente.
