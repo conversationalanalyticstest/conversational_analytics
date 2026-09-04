@@ -84,29 +84,34 @@ copia, sin que el resultado de uno dependa del orden de ejecución del otro.
 
 ---
 
-### User Story 3 - Las copias temporales no se acumulan (Priority: P2)
+### User Story 3 - Las copias huérfanas de una ejecución interrumpida no se acumulan (Priority: P2)
 
-Con el tiempo, decenas de PRs se abren, se cierran y se fusionan. Ninguna de las copias
-temporales creadas para validar esas PRs queda huérfana en el entorno de Snowflake de forma
-indefinida.
+Cada ejecución normal del check de una PR limpia su propia copia temporal al terminar, tanto si
+los tests pasan como si fallan — eso ya se cubre "gratis" al construir la copia como parte de la
+misma ejecución (User Story 1). El riesgo real es otro: una ejecución que se **interrumpe**
+antes de llegar a su paso de limpieza (el propio `cancel-in-progress` de la User Story 2, un
+runner que muere, una acción cancelada a mano) deja una copia sin dueño que ya no va a limpiarse
+sola.
 
-**Why this priority**: Es una consecuencia directa de introducir un objeto temporal: sin
-limpieza, se acumula estado — exactamente el problema de fondo que ADR-003 identificó y quiso
-evitar (viñeta "Acumulación de estado sin beneficio claro"). No es tan urgente como User Story 1
-y 2 porque un entorno de demo con pocas PRs no sufre el problema de inmediato, pero sin esto la
-feature reintroduce silenciosamente el defecto que motivó ADR-003.
+**Why this priority**: Es una consecuencia directa de introducir un objeto temporal: sin un
+mecanismo para las huérfanas, se acumula estado con el tiempo — exactamente el problema de fondo
+que ADR-003 identificó y quiso evitar (viñeta "Acumulación de estado sin beneficio claro"). No es
+tan urgente como User Story 1 y 2 porque un entorno de demo con pocas PRs no sufre el problema de
+inmediato, pero sin esto la feature reintroduce silenciosamente el defecto que motivó ADR-003.
 
-**Independent Test**: Cerrar (fusionada o no) una PR que generó una copia temporal y comprobar
-que, en un plazo acotado, esa copia deja de existir en Snowflake sin intervención manual.
+**Independent Test**: Cancelar deliberadamente un check de PR en curso (o simular que su paso de
+limpieza no llega a ejecutarse) y comprobar que, en un plazo acotado, la copia resultante deja de
+existir en Snowflake sin intervención manual recurrente.
 
 **Acceptance Scenarios**:
 
-1. **Given** una PR cuyo check creó una copia temporal de la semantic view, **When** la PR se
-   cierra (fusionada o descartada), **Then** la copia asociada a esa PR se elimina.
-2. **Given** una copia temporal que quedó huérfana por una ejecución interrumpida o fallida
-   (p. ej. el runner se canceló a mitad de la limpieza), **When** pasa un tiempo razonable,
-   **Then** existe un mecanismo (automático o manual documentado) que la detecta y la elimina,
-   de forma que no se acumule estado indefinidamente.
+1. **Given** un check de PR que termina con normalidad (tests en verde o en rojo), **When** la
+   ejecución concluye, **Then** la copia temporal creada para esa ejecución ya no existe, sin
+   esperar a que la PR se cierre.
+2. **Given** una copia temporal que quedó huérfana por una ejecución interrumpida o cancelada
+   antes de su paso de limpieza, **When** pasa un tiempo razonable, **Then** existe un mecanismo
+   (automático o manual documentado) que la detecta y la elimina, de forma que no se acumule
+   estado indefinidamente.
 
 ---
 
@@ -141,10 +146,10 @@ que, en un plazo acotado, esa copia deja de existir en Snowflake sin intervenci�
   producción ni sobre `DEPLOYMENTS` — el aislamiento es un objeto adicional propio de la PR, no
   un cambio de alcance de permisos existente (mantiene el espíritu de `contents: read` /
   "sin despliegue de candidato" de ADR-003, ahora acotado a "sin *modificar* producción").
-- **FR-005**: El sistema MUST eliminar la copia temporal asociada a una PR cuando esa PR se
-  cierra (fusionada o descartada).
+- **FR-005**: El sistema MUST eliminar la copia temporal al terminar cada ejecución del check
+  (tests en verde o en rojo), sin esperar a que la PR se cierre.
 - **FR-006**: El sistema MUST proveer un mecanismo que detecte y elimine copias temporales que
-  queden huérfanas (p. ej. por una ejecución cancelada o fallida a mitad de limpieza), sin
+  queden huérfanas por una ejecución interrumpida o cancelada antes de su paso de limpieza, sin
   requerir intervención manual recurrente.
 - **FR-007**: Si la creación de la copia temporal falla, el check MUST fallar explícitamente
   (rojo, con el motivo del fallo) en vez de continuar validando contra producción.
