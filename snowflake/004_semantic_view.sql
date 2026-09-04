@@ -108,7 +108,7 @@ CREATE OR ALTER SEMANTIC VIEW SV_PHARMA_SALES
     SALE.UNITS_SOLD AS SUM(SALE.UNITS_SOLD)
       WITH SYNONYMS ('units', 'units sold', 'volume')
       COMMENT = 'Total units sold.',
-    SALE.GROSS_SALES AS SUM(SALE.GROSS_AMOUNT)
+    SALE.GROSS_SALES AS SUM(SALE.GROSS_AMONT)
       WITH SYNONYMS ('gross sales', 'gross revenue')
       COMMENT = 'Total gross sales in euros, before discount.',
     SALE.DISCOUNT AS SUM(SALE.DISCOUNT_AMOUNT)
